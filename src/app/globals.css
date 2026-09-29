@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* `inline` faz as classes usarem var(--brand) do elemento, permitindo a cor de cada barbearia. */
+@theme inline {
+  --color-brand: var(--brand);
+  --color-surface: #141518;
+  --color-card: #1a1b1f;
+  --color-line: #26272b;
+  --color-muted: #838896;
+}
+
+:root {
+  --brand: #8162ff;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-surface);
+  color: #fff;
+}
+
+/* Classes utilitárias próprias (Tailwind 4 usa @utility para permitir @apply entre elas). */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-brand text-white hover:brightness-110;
+}
+@utility btn-secondary {
+  @apply btn border border-line bg-card text-white hover:bg-line;
+}
+@utility btn-danger {
+  @apply btn border border-red-900 bg-red-950 text-red-200 hover:bg-red-900;
+}
+@utility card {
+  @apply rounded-xl border border-line bg-card p-4;
+}
+@utility input {
+  @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand;
+}
+@utility label {
+  @apply mb-1 block text-xs font-medium text-muted uppercase;
+}
+@utility badge {
+  @apply inline-flex rounded-full px-2 py-0.5 text-xs font-semibold;
+}

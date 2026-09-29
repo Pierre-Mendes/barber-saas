@@ -1,0 +1,272 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Identidade (global) ─────────────────────────────────────────────────────
+// O usuário é global na plataforma. O que cada barbearia enxerga dele é o
+// registro `Customer` do tenant — nunca a lista de outras barbearias.
+
+model User {
+  id              String    @id @default(cuid())
+  name            String?
+  email           String    @unique
+  emailVerified   DateTime?
+  image           String?
+  phone           String?
+  isPlatformAdmin Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  accounts          Account[]
+  memberships       Membership[]
+  customers         Customer[]
+  favorites         Favorite[]
+  pushSubscriptions PushSubscription[]
+  barberProfiles    Barber[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ─── Tenant (barbearia) ──────────────────────────────────────────────────────
+
+model Tenant {
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  customDomain        String?  @unique
+  name                String
+  description         String   @default("")
+  address             String   @default("")
+  phones              String[] @default([])
+  logoUrl             String?
+  bannerUrl           String?
+  primaryColor        String   @default("#8162ff")
+  timezone            String   @default("America/Sao_Paulo")
+  slotIntervalMinutes Int      @default(15)
+  minBookingLeadMin   Int      @default(30)
+  minCancelHours      Int      @default(2)
+  bookingWindowDays   Int      @default(30)
+  listedInMarketplace Boolean  @default(true)
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  memberships Membership[]
+  barbers     Barber[]
+  services    Service[]
+  customers   Customer[]
+  bookings    Booking[]
+  favorites   Favorite[]
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  RECEPTIONIST
+  BARBER
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      Role
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+// ─── Agenda ──────────────────────────────────────────────────────────────────
+
+model Barber {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String?
+  name      String
+  bio       String   @default("")
+  photoUrl  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  services     BarberService[]
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
+  bookings     Booking[]
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+}
+
+model Service {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  description     String   @default("")
+  imageUrl        String?
+  price           Decimal  @db.Decimal(10, 2)
+  durationMinutes Int
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  barbers  BarberService[]
+  bookings Booking[]
+
+  @@index([tenantId])
+}
+
+model BarberService {
+  barberId  String
+  serviceId String
+
+  barber  Barber  @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([barberId, serviceId])
+}
+
+/// Bloco de expediente semanal. `weekday`: 0 = domingo … 6 = sábado.
+/// Minutos contados a partir da meia-noite no fuso da barbearia.
+model WorkingHours {
+  id          String @id @default(cuid())
+  barberId    String
+  weekday     Int
+  startMinute Int
+  endMinute   Int
+
+  barber Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+  @@index([barberId, weekday])
+}
+
+model TimeOff {
+  id        String   @id @default(cuid())
+  barberId  String
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String   @default("")
+  createdAt DateTime @default(now())
+
+  barber Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+  @@index([barberId, startsAt])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  name      String
+  phone     String?
+  createdAt DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@unique([tenantId, userId])
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+/// A constraint `booking_no_overlap` (migração SQL) impede dois agendamentos
+/// ativos sobrepostos para o mesmo barbeiro, mesmo sob concorrência.
+model Booking {
+  id             String        @id @default(cuid())
+  tenantId       String
+  customerId     String
+  barberId       String
+  serviceId      String
+  startsAt       DateTime
+  endsAt         DateTime
+  status         BookingStatus @default(CONFIRMED)
+  price          Decimal       @db.Decimal(10, 2)
+  notes          String        @default("")
+  cancelledAt    DateTime?
+  reminderSentAt DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  barber   Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, startsAt])
+  @@index([barberId, startsAt])
+  @@index([customerId])
+  @@index([status, reminderSentAt, startsAt])
+}
+
+// ─── Marketplace do cliente ──────────────────────────────────────────────────
+
+model Favorite {
+  userId    String
+  tenantId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([userId, tenantId])
+}
+
+// ─── Notificações push (PWA / Web Push) ──────────────────────────────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
