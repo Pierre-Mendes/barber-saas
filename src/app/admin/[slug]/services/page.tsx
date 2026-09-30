@@ -1,17 +1,39 @@
+import { ClockIcon } from "lucide-react"
+import { FormSheet } from "@/components/admin/form-sheet"
+import { PageHeader } from "@/components/admin/page-header"
 import { Flash, type FlashParams } from "@/components/flash"
 import { SubmitButton } from "@/components/submit-button"
+import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import { Field, Input } from "@/components/ui/input"
 import { requirePanel } from "@/lib/auth/guards"
+import { serviceFallbackImage } from "@/lib/catalog"
 import { db } from "@/lib/db"
+import { formatCurrency } from "@/lib/utils"
 import { createService, updateService } from "../actions"
 
-function ServiceFields({ service }: { service?: { name: string; description: string; price: unknown; durationMinutes: number; imageUrl: string | null } }) {
+type ServiceFormValues = { name: string; description: string; price: unknown; durationMinutes: number; imageUrl: string | null }
+
+function ServiceFields({ service }: { service?: ServiceFormValues }) {
   return (
     <>
-      <input name="name" required defaultValue={service?.name} placeholder="Nome" className="input" />
-      <input name="price" required defaultValue={service ? String(service.price) : ""} placeholder="Preço (ex: 45,00)" inputMode="decimal" className="input" />
-      <input name="durationMinutes" required type="number" min={5} step={5} defaultValue={service?.durationMinutes ?? 30} className="input" title="Duração (min)" />
-      <input name="imageUrl" defaultValue={service?.imageUrl ?? ""} placeholder="URL da imagem (opcional)" className="input" />
-      <input name="description" defaultValue={service?.description} placeholder="Descrição" className="input sm:col-span-2" />
+      <Field label="Nome">
+        <Input name="name" required defaultValue={service?.name} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Preço (R$)">
+          <Input name="price" required defaultValue={service ? String(service.price) : ""} placeholder="45,00" inputMode="decimal" />
+        </Field>
+        <Field label="Duração (min)">
+          <Input name="durationMinutes" required type="number" min={5} step={5} defaultValue={service?.durationMinutes ?? 30} />
+        </Field>
+      </div>
+      <Field label="Descrição">
+        <Input name="description" defaultValue={service?.description} />
+      </Field>
+      <Field label="Imagem (URL)" hint="Opcional. Sem imagem, usamos uma ilustração.">
+        <Input name="imageUrl" defaultValue={service?.imageUrl ?? ""} placeholder="https://…" />
+      </Field>
     </>
   )
 }
@@ -21,27 +43,54 @@ export default async function ServicesPage({ params, searchParams }: { params: P
   const ctx = await requirePanel(slug, "services.manage")
   const services = await db.service.findMany({
     where: { tenantId: ctx.tenant.id },
+    include: { _count: { select: { barbers: true } } },
     orderBy: [{ active: "desc" }, { name: "asc" }],
   })
 
   return (
-    <div className="space-y-6">
+    <>
       <Flash {...await searchParams} />
-      <h1 className="text-2xl font-bold">Serviços</h1>
-      {services.map((service) => (
-        <form key={service.id} action={updateService.bind(null, slug, service.id)} className="card grid gap-2 sm:grid-cols-4">
-          <ServiceFields service={service} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="active" defaultChecked={service.active} /> Ativo
-          </label>
-          <SubmitButton className="btn-secondary">Salvar</SubmitButton>
-        </form>
-      ))}
-      <form action={createService.bind(null, slug)} className="card grid gap-2 sm:grid-cols-4">
-        <h2 className="label sm:col-span-4">Novo serviço</h2>
-        <ServiceFields />
-        <SubmitButton className="btn-primary sm:col-span-2">Adicionar serviço</SubmitButton>
-      </form>
-    </div>
+      <PageHeader title="Serviços" description="O que aparece para o cliente na sua página.">
+        <FormSheet triggerLabel="Novo serviço" title="Novo serviço" description="Todos os barbeiros ativos passam a oferecer o serviço.">
+          <form action={createService.bind(null, slug)} className="grid gap-4">
+            <ServiceFields />
+            <SubmitButton>Adicionar serviço</SubmitButton>
+          </form>
+        </FormSheet>
+      </PageHeader>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {services.map((service) => (
+          <Card key={service.id} className="flex gap-4 p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={service.imageUrl ?? serviceFallbackImage(service.name)} alt="" className="size-24 shrink-0 rounded-lg object-cover" />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-semibold">{service.name}</p>
+                {!service.active && <Badge variant="secondary">inativo</Badge>}
+              </div>
+              <p className="line-clamp-1 text-sm text-muted-foreground">{service.description}</p>
+              <p className="mt-1 flex items-center gap-2 text-sm">
+                <span className="font-bold text-primary">{formatCurrency(service.price)}</span>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <ClockIcon className="size-3" /> {service.durationMinutes} min · {service._count.barbers} barbeiros
+                </span>
+              </p>
+              <div className="mt-auto pt-2">
+                <FormSheet edit triggerLabel="Editar" title={`Editar ${service.name}`}>
+                  <form action={updateService.bind(null, slug, service.id)} className="grid gap-4">
+                    <ServiceFields service={service} />
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" name="active" defaultChecked={service.active} className="size-4 accent-[var(--brand)]" /> Ativo
+                    </label>
+                    <SubmitButton>Salvar</SubmitButton>
+                  </form>
+                </FormSheet>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </>
   )
 }

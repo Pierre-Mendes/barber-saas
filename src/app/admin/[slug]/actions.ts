@@ -19,6 +19,9 @@ function back(path: string, kind: "erro" | "ok", message: string): never {
   redirect(`${path}${separator}${kind}=${encodeURIComponent(message)}`)
 }
 
+/** URL absoluta ou caminho local (ex.: arte de demonstração em /demo/...). */
+const imageRef = z.union([z.url(), z.string().regex(/^\/[\w\-./]+$/), z.literal("")])
+
 function text(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim()
 }
@@ -121,7 +124,7 @@ const serviceSchema = z.object({
   description: z.string().max(300),
   price: z.coerce.number().min(0).max(100000),
   durationMinutes: z.coerce.number().int().min(5).max(600),
-  imageUrl: z.union([z.url(), z.literal("")]),
+  imageUrl: imageRef,
 })
 
 function parseService(formData: FormData) {
@@ -197,7 +200,7 @@ export async function updateBarberProfile(slug: string, barberId: string, formDa
   await requireBarber(ctx, barberId)
   const path = `/admin/${slug}/barbers/${barberId}`
   const photoUrl = text(formData, "photoUrl")
-  if (photoUrl && !z.url().safeParse(photoUrl).success) {
+  if (!imageRef.safeParse(photoUrl).success) {
     back(path, "erro", "URL da foto inválida.")
   }
   const userId = text(formData, "userId") || null
@@ -397,8 +400,8 @@ const settingsSchema = z.object({
   description: z.string().max(1000),
   address: z.string().max(200),
   phones: z.string().max(200),
-  logoUrl: z.union([z.url(), z.literal("")]),
-  bannerUrl: z.union([z.url(), z.literal("")]),
+  logoUrl: imageRef,
+  bannerUrl: imageRef,
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida."),
   timezone: z.string().refine((tz) => {
     try {

@@ -1,6 +1,13 @@
+import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
+import { ChevronLeftIcon, Trash2Icon } from "lucide-react"
+import { PageHeader } from "@/components/admin/page-header"
 import { Flash, type FlashParams } from "@/components/flash"
 import { SubmitButton } from "@/components/submit-button"
+import { UserAvatar } from "@/components/user-avatar"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Field, Input, NativeSelect, Textarea } from "@/components/ui/input"
 import { canManageBarberSchedule, requirePanel } from "@/lib/auth/guards"
 import { can, ROLE_LABELS } from "@/lib/auth/permissions"
 import { db } from "@/lib/db"
@@ -40,97 +47,148 @@ export default async function BarberDetailPage({
   const offered = new Set(barber.services.map((s) => s.serviceId))
 
   return (
-    <div className="space-y-8">
+    <>
       <Flash {...await searchParams} />
-      <h1 className="text-2xl font-bold">{barber.name}</h1>
-
       {canEditProfile && (
-        <form action={updateBarberProfile.bind(null, slug, barber.id)} className="card grid gap-3 sm:grid-cols-2">
-          <h2 className="label sm:col-span-2">Perfil</h2>
-          <input name="name" defaultValue={barber.name} className="input" placeholder="Nome" />
-          <input name="photoUrl" defaultValue={barber.photoUrl ?? ""} className="input" placeholder="URL da foto" />
-          <textarea name="bio" defaultValue={barber.bio} className="input sm:col-span-2" placeholder="Bio" rows={2} />
-          <div>
-            <label className="label" htmlFor="userId">Acesso ao painel (vincular usuário)</label>
-            <select id="userId" name="userId" defaultValue={barber.userId ?? ""} className="input">
-              <option value="">— sem acesso —</option>
-              {members.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {m.user.name ?? m.user.email} ({ROLE_LABELS[m.role]})
-                </option>
-              ))}
-            </select>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="active" defaultChecked={barber.active} /> Ativo (aparece para agendamento)
-          </label>
-          <fieldset className="sm:col-span-2">
-            <legend className="label">Serviços que realiza</legend>
-            <div className="flex flex-wrap gap-3">
-              {services.map((s) => (
-                <label key={s.id} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="serviceIds" value={s.id} defaultChecked={offered.has(s.id)} /> {s.name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <SubmitButton className="btn-primary sm:col-span-2">Salvar perfil</SubmitButton>
-        </form>
+        <Button variant="ghost" size="sm" className="mb-2 -ml-2" asChild>
+          <Link href={`/admin/${slug}/barbers`}>
+            <ChevronLeftIcon /> Barbeiros
+          </Link>
+        </Button>
       )}
+      <PageHeader title={<span className="flex items-center gap-3"><UserAvatar name={barber.name} image={barber.photoUrl} className="size-12" />{barber.name}</span>} />
 
-      <form action={updateWorkingHours.bind(null, slug, barber.id)} className="card space-y-3">
-        <h2 className="label">Horário de trabalho (fuso {ctx.tenant.timezone})</h2>
-        <p className="text-xs text-muted">Dois blocos por dia permitem pausa para almoço.</p>
-        {WEEKDAY_LABELS.map((label, weekday) => {
-          const blocks = barber.workingHours.filter((w) => w.weekday === weekday)
-          const [a, b] = blocks
-          return (
-            <div key={weekday} className="grid grid-cols-[110px_1fr] items-center gap-2 sm:grid-cols-[110px_1fr_1fr]">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name={`d${weekday}.on`} defaultChecked={blocks.length > 0} /> {label}
-              </label>
-              <div className="flex items-center gap-1">
-                <input type="time" name={`d${weekday}.a.start`} defaultValue={a ? minutesToHHMM(a.startMinute) : "09:00"} className="input" />
-                <span>–</span>
-                <input type="time" name={`d${weekday}.a.end`} defaultValue={a ? minutesToHHMM(a.endMinute) : "12:00"} className="input" />
-              </div>
-              <div className="col-start-2 flex items-center gap-1 sm:col-start-auto">
-                <input type="time" name={`d${weekday}.b.start`} defaultValue={b ? minutesToHHMM(b.startMinute) : ""} className="input" />
-                <span>–</span>
-                <input type="time" name={`d${weekday}.b.end`} defaultValue={b ? minutesToHHMM(b.endMinute) : ""} className="input" />
-              </div>
-            </div>
-          )
-        })}
-        <SubmitButton>Salvar horários</SubmitButton>
-      </form>
-
-      <section className="card space-y-3">
-        <h2 className="label">Folgas e bloqueios</h2>
-        <ul className="space-y-2 text-sm">
-          {barber.timeOff.length === 0 && <li className="text-muted">Nenhuma folga futura.</li>}
-          {barber.timeOff.map((off) => (
-            <li key={off.id} className="flex items-center justify-between gap-2">
-              <span>
-                {formatDateTime(off.startsAt, ctx.tenant.timezone, { dateStyle: "short" })} →{" "}
-                {formatDateTime(off.endsAt, ctx.tenant.timezone, { dateStyle: "short" })}
-                {off.reason && <span className="text-muted"> • {off.reason}</span>}
-              </span>
-              <form action={removeTimeOff.bind(null, slug, barber.id, off.id)}>
-                <button className="text-red-300 hover:underline">remover</button>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {canEditProfile && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Perfil</CardTitle>
+              <CardDescription>Como o barbeiro aparece para os clientes.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={updateBarberProfile.bind(null, slug, barber.id)} className="grid gap-4 sm:grid-cols-2">
+                <Field label="Nome">
+                  <Input name="name" defaultValue={barber.name} />
+                </Field>
+                <Field label="Foto (URL)">
+                  <Input name="photoUrl" defaultValue={barber.photoUrl ?? ""} placeholder="https://…" />
+                </Field>
+                <Field label="Bio" className="sm:col-span-2">
+                  <Textarea name="bio" defaultValue={barber.bio} rows={2} />
+                </Field>
+                <Field label="Acesso ao painel" hint="Vincule a um membro da equipe para ele ver a própria agenda.">
+                  <NativeSelect name="userId" defaultValue={barber.userId ?? ""}>
+                    <option value="">— sem acesso —</option>
+                    {members.map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.user.name ?? m.user.email} ({ROLE_LABELS[m.role]})
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                <label className="flex items-center gap-2 self-center text-sm">
+                  <input type="checkbox" name="active" defaultChecked={barber.active} className="size-4 accent-[var(--brand)]" />
+                  Ativo (aparece para agendamento)
+                </label>
+                <fieldset className="sm:col-span-2">
+                  <legend className="mb-2 text-xs font-semibold text-muted-foreground">Serviços que realiza</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {services.map((s) => (
+                      <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/15">
+                        <input type="checkbox" name="serviceIds" value={s.id} defaultChecked={offered.has(s.id)} className="accent-[var(--brand)]" />
+                        {s.name}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <SubmitButton className="sm:col-span-2 sm:justify-self-start">Salvar perfil</SubmitButton>
               </form>
-            </li>
-          ))}
-        </ul>
-        <form action={addTimeOff.bind(null, slug, barber.id)} className="grid gap-2 sm:grid-cols-3">
-          <input type="date" name="startDate" required className="input" />
-          <input type="time" name="startTime" className="input" title="Início (vazio = dia todo)" />
-          <input name="reason" placeholder="Motivo (opcional)" className="input" />
-          <input type="date" name="endDate" className="input" title="Fim (vazio = mesmo dia)" />
-          <input type="time" name="endTime" className="input" title="Fim (vazio = fim do dia)" />
-          <SubmitButton className="btn-secondary">Bloquear período</SubmitButton>
-        </form>
-      </section>
-    </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Horário de trabalho</CardTitle>
+            <CardDescription>Dois blocos por dia permitem pausa para almoço. Fuso: {ctx.tenant.timezone}.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={updateWorkingHours.bind(null, slug, barber.id)} className="space-y-3">
+              {WEEKDAY_LABELS.map((label, weekday) => {
+                const blocks = barber.workingHours.filter((w) => w.weekday === weekday)
+                const [a, b] = blocks
+                return (
+                  <div key={weekday} className="grid grid-cols-[92px_1fr] items-center gap-2 border-b pb-3 last:border-0">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <input type="checkbox" name={`d${weekday}.on`} defaultChecked={blocks.length > 0} className="size-4 accent-[var(--brand)]" />
+                      {label}
+                    </label>
+                    <div className="grid gap-2">
+                      <div className="flex items-center gap-1">
+                        <Input type="time" name={`d${weekday}.a.start`} defaultValue={a ? minutesToHHMM(a.startMinute) : "09:00"} />
+                        <span className="text-muted-foreground">–</span>
+                        <Input type="time" name={`d${weekday}.a.end`} defaultValue={a ? minutesToHHMM(a.endMinute) : "12:00"} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Input type="time" name={`d${weekday}.b.start`} defaultValue={b ? minutesToHHMM(b.startMinute) : ""} />
+                        <span className="text-muted-foreground">–</span>
+                        <Input type="time" name={`d${weekday}.b.end`} defaultValue={b ? minutesToHHMM(b.endMinute) : ""} />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              <SubmitButton>Salvar horários</SubmitButton>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="self-start">
+          <CardHeader>
+            <CardTitle>Folgas e bloqueios</CardTitle>
+            <CardDescription>Períodos em que o barbeiro não atende.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ul className="space-y-2 text-sm">
+              {barber.timeOff.length === 0 && <li className="text-muted-foreground">Nenhuma folga futura.</li>}
+              {barber.timeOff.map((off) => (
+                <li key={off.id} className="flex items-center justify-between gap-2 rounded-lg border p-3">
+                  <span>
+                    {formatDateTime(off.startsAt, ctx.tenant.timezone, { dateStyle: "short" })} →{" "}
+                    {formatDateTime(off.endsAt, ctx.tenant.timezone, { dateStyle: "short" })}
+                    {off.reason && <span className="block text-xs text-muted-foreground">{off.reason}</span>}
+                  </span>
+                  <form action={removeTimeOff.bind(null, slug, barber.id, off.id)}>
+                    <Button size="icon-sm" variant="ghost" aria-label="Remover folga">
+                      <Trash2Icon className="text-red-300" />
+                    </Button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+            <form action={addTimeOff.bind(null, slug, barber.id)} className="grid grid-cols-2 gap-3">
+              <Field label="Início">
+                <Input type="date" name="startDate" required />
+              </Field>
+              <Field label="Hora (vazio = dia todo)">
+                <Input type="time" name="startTime" />
+              </Field>
+              <Field label="Fim (vazio = mesmo dia)">
+                <Input type="date" name="endDate" />
+              </Field>
+              <Field label="Hora">
+                <Input type="time" name="endTime" />
+              </Field>
+              <Field label="Motivo" className="col-span-2">
+                <Input name="reason" placeholder="Férias, curso…" />
+              </Field>
+              <SubmitButton variant="secondary" className="col-span-2">
+                Bloquear período
+              </SubmitButton>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   )
 }

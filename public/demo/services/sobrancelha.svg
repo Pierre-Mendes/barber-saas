@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#be185d"/><stop offset="1" stop-color="#4a0424"/></linearGradient>
+  <radialGradient id="r" cx=".3" cy=".25" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+  <rect width="220" height="220" fill="url(#g)"/><rect width="220" height="220" fill="url(#r)"/>
+  
+  <g transform="translate(110 110) scale(1)" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round">
+    <path d="M-58 -22 Q0 -58 58 -18"/><path d="M-50 18 Q0 -18 50 18 Q0 50 -50 18 Z"/><circle cx="0" cy="18" r="12" fill="#fff"/>
+  </g>
+  <title>sobrancelha</title>
+</svg>

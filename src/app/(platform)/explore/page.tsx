@@ -1,127 +1,74 @@
 import Link from "next/link"
-import { toggleFavoriteAction } from "@/app/actions/customer"
+import { BarbershopItem } from "@/components/barbershop-item"
+import { QuickSearch } from "@/components/quick-search"
+import { SearchBar } from "@/components/search-bar"
+import { Button } from "@/components/ui/button"
 import { requireUser } from "@/lib/auth/guards"
-import { db } from "@/lib/db"
-import { rankBarbershops, type MarketplaceSort } from "@/lib/marketplace/ranking"
-import { tenantPublicUrlFor } from "@/lib/tenancy/urls"
+import { findCategory } from "@/lib/catalog"
+import { getMarketplaceShops } from "@/lib/marketplace/queries"
+import type { MarketplaceSort } from "@/lib/marketplace/ranking"
+import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Barbearias" }
 
 /**
- * Vitrine para clientes com conta: todas as barbearias listadas, favoritas no
- * topo e ordenação por atendimentos concluídos. As barbearias não veem esta tela.
+ * Busca/vitrine para clientes com conta (equivalente ao /barbershops do projeto base):
+ * favoritas no topo e ordenação por atendimentos concluídos.
  */
 export default async function ExplorePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sort?: string }>
+  searchParams: Promise<{ q?: string; servico?: string; ordem?: string }>
 }) {
   const user = await requireUser("/explore")
-  const { q = "", sort: sortParam } = await searchParams
-  const sort: MarketplaceSort = sortParam === "mine" ? "mine" : "popular"
-  const term = q.trim()
+  const { q = "", servico, ordem } = await searchParams
+  const sort: MarketplaceSort = ordem === "minhas" ? "mine" : "popular"
+  const category = findCategory(servico)
+  const shops = await getMarketplaceShops(user.id, { q, category: servico, sort })
 
-  const tenants = await db.tenant.findMany({
-    where: {
-      active: true,
-      AND: [
-        { OR: [{ listedInMarketplace: true }, { favorites: { some: { userId: user.id } } }] },
-        term
-          ? {
-              OR: [
-                { name: { contains: term, mode: "insensitive" } },
-                { address: { contains: term, mode: "insensitive" } },
-                { services: { some: { active: true, name: { contains: term, mode: "insensitive" } } } },
-              ],
-            }
-          : {},
-      ],
-    },
-    select: {
-      id: true,
-      slug: true,
-      customDomain: true,
-      name: true,
-      address: true,
-      logoUrl: true,
-      bannerUrl: true,
-      primaryColor: true,
-      favorites: { where: { userId: user.id }, select: { userId: true } },
-      _count: { select: { bookings: { where: { status: "COMPLETED" } } } },
-    },
-  })
-
-  const mine = await db.booking.groupBy({
-    by: ["tenantId"],
-    where: { status: "COMPLETED", customer: { userId: user.id } },
-    _count: { _all: true },
-  })
-  const myCounts = new Map(mine.map((row) => [row.tenantId, row._count._all]))
-
-  const ranked = rankBarbershops(
-    tenants.map((tenant) => ({
-      ...tenant,
-      isFavorite: tenant.favorites.length > 0,
-      completedCount: tenant._count.bookings,
-      myCompletedCount: myCounts.get(tenant.id) ?? 0,
-    })),
-    sort,
-  )
+  const sortLink = (value: string) => {
+    const params = new URLSearchParams()
+    if (q) {
+      params.set("q", q)
+    }
+    if (servico) {
+      params.set("servico", servico)
+    }
+    if (value) {
+      params.set("ordem", value)
+    }
+    return `/explore?${params.toString()}`
+  }
+  const heading = q ? `Resultados para "${q}"` : category ? category.title : "Todas as barbearias"
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Barbearias</h1>
-          <p className="text-sm text-muted">Suas favoritas aparecem primeiro.</p>
+    <div className="space-y-6">
+      <SearchBar defaultValue={q} />
+      <QuickSearch active={servico} />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="section-title mb-0">
+          {heading} · {shops.length}
+        </h2>
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" className={cn(sort === "popular" && "bg-primary text-primary-foreground hover:bg-primary")} asChild>
+            <Link href={sortLink("")}>Mais atendimentos</Link>
+          </Button>
+          <Button size="sm" variant="secondary" className={cn(sort === "mine" && "bg-primary text-primary-foreground hover:bg-primary")} asChild>
+            <Link href={sortLink("minhas")}>Onde eu mais fui</Link>
+          </Button>
         </div>
-        <form className="flex gap-2">
-          <input name="q" defaultValue={term} placeholder="Buscar por nome, bairro ou serviço" className="input w-64" />
-          <select name="sort" defaultValue={sort} className="input w-auto">
-            <option value="popular">Mais atendimentos</option>
-            <option value="mine">Onde eu mais fui</option>
-          </select>
-          <button className="btn-primary">Filtrar</button>
-        </form>
       </div>
 
-      {ranked.length === 0 && <p className="mt-10 text-center text-muted">Nenhuma barbearia encontrada.</p>}
-
-      <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {ranked.map((tenant) => (
-          <li key={tenant.id} className="card flex flex-col gap-3">
-            <div
-              className="h-28 rounded-lg bg-cover bg-center"
-              style={{
-                backgroundColor: tenant.primaryColor,
-                backgroundImage: tenant.bannerUrl ? `url(${tenant.bannerUrl})` : undefined,
-              }}
-            />
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h2 className="font-semibold">{tenant.name}</h2>
-                <p className="text-xs text-muted">{tenant.address}</p>
-              </div>
-              <form action={toggleFavoriteAction.bind(null, tenant.id)}>
-                <button
-                  aria-label={tenant.isFavorite ? "Remover dos favoritos" : "Favoritar"}
-                  className="text-xl text-yellow-400"
-                  title={tenant.isFavorite ? "Remover dos favoritos" : "Favoritar"}
-                >
-                  {tenant.isFavorite ? "★" : "☆"}
-                </button>
-              </form>
-            </div>
-            <p className="text-xs text-muted">
-              {tenant.completedCount} atendimentos
-              {tenant.myCompletedCount > 0 && ` • você foi ${tenant.myCompletedCount}x`}
-            </p>
-            <Link href={tenantPublicUrlFor(tenant)} className="btn-primary mt-auto">
-              Agendar
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {shops.length === 0 ? (
+        <p className="py-10 text-center text-muted-foreground">Nenhuma barbearia encontrada.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          {shops.map((shop) => (
+            <BarbershopItem key={shop.id} shop={shop} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a16207"/><stop offset="1" stop-color="#3b2106"/></linearGradient>
+  <radialGradient id="r" cx=".3" cy=".25" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+  <rect width="220" height="220" fill="url(#g)"/><rect width="220" height="220" fill="url(#r)"/>
+  
+  <g transform="translate(110 110) scale(1) rotate(-20)" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round">
+    <rect x="-60" y="-18" width="120" height="18" rx="6"/>
+    <path d="M-52 0 V34"/><path d="M-41.6 0 V26"/><path d="M-31.2 0 V34"/><path d="M-20.799999999999997 0 V26"/><path d="M-10.399999999999999 0 V34"/><path d="M0 0 V26"/><path d="M10.400000000000006 0 V34"/><path d="M20.799999999999997 0 V26"/><path d="M31.200000000000003 0 V34"/><path d="M41.60000000000001 0 V26"/><path d="M52 0 V34"/>
+  </g>
+  <title>acabamento</title>
+</svg>

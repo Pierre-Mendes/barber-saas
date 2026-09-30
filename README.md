@@ -15,9 +15,27 @@ Inspirado no [fullstackweek-barber-v2](https://github.com/felipemotarocha/fullst
 | Banco | PostgreSQL 16 + Prisma 6 |
 | Auth | Auth.js v5: link mágico por e-mail (e Google opcional) |
 | Notificações | E-mail (Nodemailer/SMTP) com `.ics` anexo + Web Push (PWA, VAPID) |
-| UI | Tailwind CSS 4 |
+| UI | Tailwind CSS 4, componentes no padrão shadcn/ui (Radix), lucide-react, sonner (toasts) |
 | Testes | Vitest (unitários + integração com Postgres real) |
 | Infra | Docker / docker-compose, GitHub Actions |
+
+## Telas
+
+Visual inspirado no projeto base (tema escuro, mobile first):
+
+- **Home do cliente:** saudação, busca, atalhos por serviço (Cabelo, Barba…), banner, próximos agendamentos,
+  favoritas, recomendados, populares e "onde você mais vai".
+- **Busca** (`/explore`): filtros por termo/categoria e ordenação por atendimentos.
+- **Página da barbearia** (white-label): capa, endereço, "Sobre nós", profissionais, serviços com
+  "Reservar" → painel lateral com profissional, calendário, horários, resumo e confirmação.
+- **Agendamentos:** confirmados e finalizados; detalhe com mapa, resumo, telefones (copiar),
+  "salvar na agenda" e cancelamento com confirmação.
+- **Menu lateral e login em diálogo** (link por e-mail ou Google).
+- **Painel:** barra lateral (gaveta no celular), agenda do dia com indicadores, barbeiros, serviços,
+  equipe e personalização. A cor escolhida pela barbearia é aplicada em tudo.
+
+A arte de demonstração (capas, ilustrações de serviços, mapa) é própria, gerada por
+`node scripts/generate-demo-art.mjs`. As barbearias usam as próprias fotos via URL.
 
 ## Como funciona o multi-tenant
 

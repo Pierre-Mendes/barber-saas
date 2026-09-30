@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation"
 import { z } from "zod"
+import { StoreIcon } from "lucide-react"
 import { SubmitButton } from "@/components/submit-button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Field, Input } from "@/components/ui/input"
 import { requireUser } from "@/lib/auth/guards"
 import { isPrismaUniqueViolation } from "@/lib/booking/service"
 import { db } from "@/lib/db"
@@ -58,37 +61,35 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
   return (
     <div className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-bold">Cadastrar minha barbearia</h1>
-      <p className="mt-1 text-sm text-muted">Em seguida você cadastra serviços, barbeiros e horários.</p>
-      {error && <p className="mt-4 rounded-lg bg-red-950 p-3 text-sm text-red-200">{error}</p>}
-      <form action={createTenant} className="card mt-6 space-y-4">
-        <div>
-          <label className="label" htmlFor="name">Nome da barbearia</label>
-          <input id="name" name="name" required className="input" />
-        </div>
-        <div>
-          <label className="label" htmlFor="slug">Seu link</label>
-          <input
-            id="slug"
-            name="slug"
-            required
-            pattern="[a-z0-9][a-z0-9\-]{1,38}[a-z0-9]"
-            placeholder="barbearia-do-ze"
-            className="input"
-          />
-          <p className="mt-1 text-xs text-muted">Letras minúsculas, números e hífen. Vira o endereço que você divulga.</p>
-        </div>
-        <div>
-          <label className="label" htmlFor="address">Endereço</label>
-          <input id="address" name="address" className="input" />
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="iAmBarber" defaultChecked /> Eu também atendo como barbeiro
-        </label>
-        <SubmitButton className="btn-primary w-full" pendingText="Criando…">
-          Criar barbearia
-        </SubmitButton>
-      </form>
+      <Card>
+        <CardHeader className="items-start">
+          <div className="mb-2 flex size-11 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <StoreIcon className="size-5" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Cadastrar minha barbearia</CardTitle>
+          <CardDescription>Em seguida você cadastra serviços, barbeiros e horários.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && <p className="mb-4 rounded-lg bg-destructive/15 p-3 text-sm text-red-300">{error}</p>}
+          <form action={createTenant} className="grid gap-4">
+            <Field label="Nome da barbearia" htmlFor="name">
+              <Input id="name" name="name" required />
+            </Field>
+            <Field label="Seu link" htmlFor="slug" hint="Letras minúsculas, números e hífen. É o endereço que você vai divulgar.">
+              <Input id="slug" name="slug" required pattern="[a-z0-9][a-z0-9\-]{1,38}[a-z0-9]" placeholder="barbearia-do-ze" />
+            </Field>
+            <Field label="Endereço" htmlFor="address">
+              <Input id="address" name="address" />
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="iAmBarber" defaultChecked className="size-4 accent-[var(--brand)]" /> Eu também atendo como barbeiro
+            </label>
+            <SubmitButton size="lg" pendingText="Criando…">
+              Criar barbearia
+            </SubmitButton>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

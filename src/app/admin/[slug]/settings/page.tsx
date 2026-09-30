@@ -1,65 +1,100 @@
+import { PageHeader } from "@/components/admin/page-header"
 import { Flash, type FlashParams } from "@/components/flash"
 import { SubmitButton } from "@/components/submit-button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Field, Input, Textarea } from "@/components/ui/input"
 import { requirePanel } from "@/lib/auth/guards"
-import { env } from "@/lib/env"
+import { tenantFallbackCover } from "@/lib/catalog"
+import { tenantPublicUrlFor } from "@/lib/tenancy/urls"
 import { updateSettings } from "../actions"
-
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
-  return (
-    <div>
-      <span className="label">{label}</span>
-      {children}
-      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
-    </div>
-  )
-}
 
 export default async function SettingsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: FlashParams }) {
   const { slug } = await params
   const { tenant } = await requirePanel(slug, "settings.manage")
 
   return (
-    <div className="space-y-6">
+    <>
       <Flash {...await searchParams} />
-      <h1 className="text-2xl font-bold">Personalização</h1>
+      <PageHeader title="Personalização" description="Como sua barbearia aparece para os clientes." />
       <form action={updateSettings.bind(null, slug)} className="space-y-6">
-        <section className="card grid gap-4 sm:grid-cols-2">
-          <h2 className="label sm:col-span-2">Identidade</h2>
-          <Field label="Nome"><input name="name" defaultValue={tenant.name} required className="input" /></Field>
-          <Field label="Cor principal"><input name="primaryColor" type="color" defaultValue={tenant.primaryColor} className="h-10 w-full rounded-lg" /></Field>
-          <Field label="Logo (URL)"><input name="logoUrl" defaultValue={tenant.logoUrl ?? ""} className="input" /></Field>
-          <Field label="Banner (URL)"><input name="bannerUrl" defaultValue={tenant.bannerUrl ?? ""} className="input" /></Field>
-          <div className="sm:col-span-2">
-            <Field label="Descrição"><textarea name="description" defaultValue={tenant.description} rows={3} className="input" /></Field>
+        <Card className="overflow-hidden">
+          <div className="relative h-40">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={tenant.bannerUrl ?? tenantFallbackCover(tenant.id)} alt="" className="size-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
           </div>
-          <Field label="Endereço"><input name="address" defaultValue={tenant.address} className="input" /></Field>
-          <Field label="Telefones" hint="Separe por vírgula."><input name="phones" defaultValue={tenant.phones.join(", ")} className="input" /></Field>
-        </section>
+          <CardHeader>
+            <CardTitle>Identidade</CardTitle>
+            <CardDescription>Nome, cores e imagens da sua página.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Field label="Nome">
+              <Input name="name" defaultValue={tenant.name} required />
+            </Field>
+            <Field label="Cor principal">
+              <Input name="primaryColor" type="color" defaultValue={tenant.primaryColor} className="cursor-pointer" />
+            </Field>
+            <Field label="Logo (URL)">
+              <Input name="logoUrl" defaultValue={tenant.logoUrl ?? ""} placeholder="https://…" />
+            </Field>
+            <Field label="Capa (URL)">
+              <Input name="bannerUrl" defaultValue={tenant.bannerUrl ?? ""} placeholder="https://…" />
+            </Field>
+            <Field label="Sobre nós" className="sm:col-span-2">
+              <Textarea name="description" defaultValue={tenant.description} rows={3} />
+            </Field>
+            <Field label="Endereço">
+              <Input name="address" defaultValue={tenant.address} />
+            </Field>
+            <Field label="Telefones" hint="Separe por vírgula.">
+              <Input name="phones" defaultValue={tenant.phones.join(", ")} />
+            </Field>
+          </CardContent>
+        </Card>
 
-        <section className="card grid gap-4 sm:grid-cols-2">
-          <h2 className="label sm:col-span-2">Seu link</h2>
-          <Field label="Endereço do link" hint={`Fica ${slug}.${env.rootDomain}. Mudar quebra links já divulgados.`}>
-            <input name="slug" defaultValue={tenant.slug} required className="input" />
-          </Field>
-          <Field
-            label="Domínio próprio (opcional)"
-            hint="Ex.: agenda.suabarbearia.com.br — crie um CNAME apontando para a plataforma."
-          >
-            <input name="customDomain" defaultValue={tenant.customDomain ?? ""} className="input" />
-          </Field>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Seu link</CardTitle>
+            <CardDescription>
+              Hoje: <span className="text-primary">{tenantPublicUrlFor(tenant)}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Field label="Endereço do link" hint="Mudar quebra links já divulgados.">
+              <Input name="slug" defaultValue={tenant.slug} required />
+            </Field>
+            <Field label="Domínio próprio (opcional)" hint="Ex.: agenda.suabarbearia.com.br, com um CNAME apontando para a plataforma.">
+              <Input name="customDomain" defaultValue={tenant.customDomain ?? ""} />
+            </Field>
+          </CardContent>
+        </Card>
 
-        <section className="card grid gap-4 sm:grid-cols-3">
-          <h2 className="label sm:col-span-3">Regras da agenda</h2>
-          <Field label="Fuso horário"><input name="timezone" defaultValue={tenant.timezone} className="input" /></Field>
-          <Field label="Intervalo entre horários (min)"><input name="slotIntervalMinutes" type="number" defaultValue={tenant.slotIntervalMinutes} className="input" /></Field>
-          <Field label="Antecedência mínima (min)"><input name="minBookingLeadMin" type="number" defaultValue={tenant.minBookingLeadMin} className="input" /></Field>
-          <Field label="Cancelamento até (h antes)"><input name="minCancelHours" type="number" defaultValue={tenant.minCancelHours} className="input" /></Field>
-          <Field label="Agenda aberta por (dias)"><input name="bookingWindowDays" type="number" defaultValue={tenant.bookingWindowDays} className="input" /></Field>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Regras da agenda</CardTitle>
+            <CardDescription>Valem para todos os barbeiros.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-3">
+            <Field label="Fuso horário">
+              <Input name="timezone" defaultValue={tenant.timezone} />
+            </Field>
+            <Field label="Intervalo entre horários (min)">
+              <Input name="slotIntervalMinutes" type="number" defaultValue={tenant.slotIntervalMinutes} />
+            </Field>
+            <Field label="Antecedência mínima (min)">
+              <Input name="minBookingLeadMin" type="number" defaultValue={tenant.minBookingLeadMin} />
+            </Field>
+            <Field label="Cancelamento até (horas antes)">
+              <Input name="minCancelHours" type="number" defaultValue={tenant.minCancelHours} />
+            </Field>
+            <Field label="Agenda aberta por (dias)">
+              <Input name="bookingWindowDays" type="number" defaultValue={tenant.bookingWindowDays} />
+            </Field>
+          </CardContent>
+        </Card>
 
-        <SubmitButton>Salvar configurações</SubmitButton>
+        <SubmitButton size="lg">Salvar alterações</SubmitButton>
       </form>
-    </div>
+    </>
   )
 }

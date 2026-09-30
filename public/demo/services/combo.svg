@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0e7490"/><stop offset="1" stop-color="#082f49"/></linearGradient>
+  <radialGradient id="r" cx=".3" cy=".25" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+  <rect width="220" height="220" fill="url(#g)"/><rect width="220" height="220" fill="url(#r)"/>
+  
+  <g transform="translate(92 104) scale(0.8)" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="-26" cy="40" r="16"/><circle cx="26" cy="40" r="16"/>
+    <path d="M-15 28 L30 -50"/><path d="M15 28 L-30 -50"/><circle cx="0" cy="4" r="3" fill="#fff"/>
+  </g>
+  <g transform="translate(128 128) scale(0.7) rotate(-35)" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-60 -10 H10 Q22 -10 22 2 V8 H-60 Z"/><path d="M22 0 L70 0"/><circle cx="22" cy="0" r="4" fill="rgba(255,255,255,.75)"/>
+    <path d="M28 -6 H66 Q74 0 66 6 H28"/>
+  </g>
+  <title>combo</title>
+</svg>

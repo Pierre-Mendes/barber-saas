@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { BellIcon, BellRingIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 type State = "unsupported" | "ios-install" | "idle" | "enabled" | "denied" | "working" | "error"
 
@@ -70,20 +72,24 @@ export function PushOptIn({ vapidPublicKey }: { vapidPublicKey?: string }) {
   }
   if (state === "ios-install") {
     return (
-      <p className="text-sm text-muted">
-        📱 No iPhone, toque em <b>Compartilhar → Adicionar à Tela de Início</b> e abra por lá para receber lembretes.
+      <p className="text-xs text-muted-foreground">
+        No iPhone, toque em <b>Compartilhar → Adicionar à Tela de Início</b> e abra por lá para receber lembretes.
       </p>
     )
   }
   if (state === "enabled") {
-    return <p className="text-sm text-emerald-400">🔔 Notificações ativadas neste aparelho.</p>
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-success">
+        <BellRingIcon className="size-4" /> Lembretes ativados neste aparelho
+      </p>
+    )
   }
   if (state === "denied") {
-    return <p className="text-sm text-muted">Notificações bloqueadas no navegador. Libere nas configurações do site.</p>
+    return <p className="text-xs text-muted-foreground">Notificações bloqueadas. Libere nas configurações do site.</p>
   }
   return (
-    <button type="button" onClick={enable} disabled={state === "working"} className="btn-secondary">
-      🔔 {state === "error" ? "Tentar novamente" : "Receber lembretes no celular"}
-    </button>
+    <Button type="button" variant="outline" size="sm" onClick={enable} disabled={state === "working"}>
+      <BellIcon /> {state === "error" ? "Tentar novamente" : "Receber lembretes no celular"}
+    </Button>
   )
 }

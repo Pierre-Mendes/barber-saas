@@ -101,6 +101,27 @@ interface CreateBookingInput {
   now?: Date
 }
 
+/**
+ * Registro do cliente na barbearia. Duas reservas simultâneas do mesmo cliente
+ * novo podem disputar a criação; quem perde relê o registro criado pelo outro.
+ */
+async function findOrCreateCustomer(tenantId: string, userId: string, name: string, phone: string | null) {
+  const key = { tenantId_userId: { tenantId, userId } }
+  try {
+    return await db.customer.upsert({
+      where: key,
+      create: { tenantId, userId, name, phone },
+      update: phone ? { phone } : {},
+    })
+  } catch (error) {
+    if (!isPrismaUniqueViolation(error)) {
+      throw error
+    }
+    const existing = await db.customer.findUniqueOrThrow({ where: key })
+    return phone ? db.customer.update({ where: { id: existing.id }, data: { phone } }) : existing
+  }
+}
+
 function isOverlapViolation(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
   return message.includes("booking_no_overlap") || message.includes("23P01")
@@ -131,16 +152,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
     throw new BookingError("Esse horário não está mais disponível.", "SLOT_UNAVAILABLE")
   }
 
-  const customer = await db.customer.upsert({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: input.userId } },
-    create: {
-      tenantId: tenant.id,
-      userId: input.userId,
-      name: input.customerName,
-      phone: input.customerPhone ?? null,
-    },
-    update: input.customerPhone ? { phone: input.customerPhone } : {},
-  })
+  const customer = await findOrCreateCustomer(tenant.id, input.userId, input.customerName, input.customerPhone ?? null)
 
   try {
     return await db.booking.create({

@@ -1,20 +1,13 @@
 "use client"
 
 import { useFormStatus } from "react-dom"
+import { Button, type ButtonProps } from "@/components/ui/button"
 
-export function SubmitButton({
-  children,
-  className = "btn-primary",
-  pendingText = "Salvando…",
-}: {
-  children: React.ReactNode
-  className?: string
-  pendingText?: string
-}) {
+export function SubmitButton({ children, pendingText = "Salvando…", ...props }: ButtonProps & { pendingText?: string }) {
   const { pending } = useFormStatus()
   return (
-    <button type="submit" disabled={pending} className={className}>
+    <Button type="submit" disabled={pending || props.disabled} {...props}>
       {pending ? pendingText : children}
-    </button>
+    </Button>
   )
 }

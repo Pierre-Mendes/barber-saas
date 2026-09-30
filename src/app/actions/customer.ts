@@ -20,6 +20,7 @@ export async function toggleFavoriteAction(tenantId: string): Promise<void> {
   } else {
     await db.favorite.create({ data: { userId: user.id, tenantId } })
   }
+  revalidatePath("/")
   revalidatePath("/explore")
 }
 

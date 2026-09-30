@@ -1,46 +1,73 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-/* `inline` faz as classes usarem var(--brand) do elemento, permitindo a cor de cada barbearia. */
-@theme inline {
-  --color-brand: var(--brand);
-  --color-surface: #141518;
-  --color-card: #1a1b1f;
-  --color-line: #26272b;
-  --color-muted: #838896;
-}
-
+/*
+ * Tema escuro. `--brand` é sobrescrito por barbearia (layout da página pública e do painel),
+ * então todo `bg-primary`/`text-primary` assume a cor da barbearia.
+ */
 :root {
   --brand: #8162ff;
+  --background: hsl(225 9% 9%);
+  --foreground: hsl(210 40% 98%);
+  --card: hsl(228 9% 11%);
+  --secondary: hsl(228 6% 16%);
+  --muted-foreground: hsl(215 20% 65%);
+  --border: hsl(228 6% 16%);
+  --destructive: hsl(0 72% 51%);
+  --success: hsl(152 60% 42%);
+  --radius: 0.625rem;
   color-scheme: dark;
 }
 
-body {
-  background: var(--color-surface);
-  color: #fff;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--brand);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--secondary);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--brand);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Classes utilitárias próprias (Tailwind 4 usa @utility para permitir @apply entre elas). */
-@utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
 }
-@utility btn-primary {
-  @apply btn bg-brand text-white hover:brightness-110;
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
-@utility btn-secondary {
-  @apply btn border border-line bg-card text-white hover:bg-line;
-}
-@utility btn-danger {
-  @apply btn border border-red-900 bg-red-950 text-red-200 hover:bg-red-900;
-}
-@utility card {
-  @apply rounded-xl border border-line bg-card p-4;
-}
-@utility input {
-  @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand;
-}
-@utility label {
-  @apply mb-1 block text-xs font-medium text-muted uppercase;
-}
-@utility badge {
-  @apply inline-flex rounded-full px-2 py-0.5 text-xs font-semibold;
+
+/* Título de seção no estilo "RECOMENDADOS". */
+@utility section-title {
+  @apply mb-3 text-xs font-bold tracking-wide text-muted-foreground uppercase;
 }

@@ -88,7 +88,7 @@ describe.skipIf(!TEST_DATABASE_URL)("booking service (database)", async () => {
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1)
     const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected")
     for (const r of rejected) {
-      expect(["SLOT_TAKEN", "SLOT_UNAVAILABLE"]).toContain(r.reason.code)
+      expect(["SLOT_TAKEN", "SLOT_UNAVAILABLE"], String(r.reason?.message ?? r.reason)).toContain(r.reason.code)
     }
     expect(await db.booking.count()).toBe(1)
   })
