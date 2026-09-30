@@ -1,0 +1,55 @@
+name: Agendamento pelo cliente
+description: Cliente escolhe serviço, profissional, dia e horário na página white-label e confirma.
+conventions: [multi-tenancy, server-actions, database, ui]
+
+entrypoints:
+  - route: /t/[tenant]
+    file: src/app/t/[tenant]/page.tsx
+    symbol: TenantPage
+  - component: painel "Fazer reserva"
+    file: src/components/service-item.tsx
+    symbol: ServiceItem
+
+stages:
+  - stage: resolver_barbearia
+    description: Host/slug → Tenant ativo (404 se não existir)
+    file: src/lib/tenancy/tenant.ts
+    symbol: getTenantByRouteKey
+
+  - stage: horarios_livres
+    description: Expediente − folgas − agendamentos ativos, no fuso da barbearia, respeitando antecedência e janela
+    file: src/app/actions/customer.ts
+    symbol: getSlotsAction
+    calls:
+      - { file: src/lib/booking/service.ts, symbol: getAvailableSlots }
+      - { file: src/lib/scheduling/availability.ts, symbol: computeAvailableSlots }
+
+  - stage: confirmar
+    description: Autentica, valida (zod), revalida o horário e grava
+    file: src/app/actions/customer.ts
+    symbol: createBookingAction
+    calls:
+      - { file: src/lib/booking/service.ts, symbol: createBooking }
+      - { file: src/lib/booking/service.ts, symbol: findOrCreateCustomer }
+    errors:
+      SLOT_UNAVAILABLE: horário saiu da disponibilidade
+      SLOT_TAKEN: constraint booking_no_overlap (23P01) — outra pessoa reservou antes
+
+  - stage: notificar
+    description: after() → e-mail com .ics para cliente e barbeiro + Web Push
+    file: src/lib/notifications/index.ts
+    symbol: notifyBookingConfirmed
+
+  - stage: confirmacao
+    description: Página com resumo, salvar na agenda, lembretes e cancelamento
+    file: src/app/t/[tenant]/reserva/[id]/page.tsx
+    symbol: BookingDetailPage
+
+invariants:
+  - Barbeiro e serviço precisam ser da mesma barbearia (tenantId) e ativos
+  - Nenhum horário sobreposto por barbeiro (constraint no banco)
+  - Um Customer por (tenant, user), mesmo com reservas simultâneas
+
+tests:
+  - tests/booking.db.test.ts
+  - tests/scheduling.test.ts

@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@colbymchenry/codegraph@1", "serve", "--mcp"],
+      "env": { "CODEGRAPH_TELEMETRY": "0" }
+    },
+    "serena": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "serena-agent",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "claude-code",
+        "--project-from-cwd",
+        "--enable-web-dashboard",
+        "false"
+      ]
+    },
+    "barber-docs": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["scripts/rag/mcp-server.mjs"]
+    }
+  }
+}

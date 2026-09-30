@@ -36,6 +36,7 @@ O cliente agenda em segundos, recebe lembrete por e-mail e no celular e salva o 
 - [Scripts](#scripts)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Testes e qualidade](#testes-e-qualidade)
+- [Desenvolvimento com IA](#desenvolvimento-com-ia)
 - [Deploy em produção](#deploy-em-produção)
 - [Roadmap](#roadmap)
 
@@ -311,6 +312,21 @@ A integração roda contra um **PostgreSQL real** e cobre:
 - **três reservas simultâneas no mesmo horário**, das quais só uma passa.
 
 O CI (GitHub Actions) roda lint, typecheck, testes e build a cada push.
+
+## Desenvolvimento com IA
+
+O repositório vem preparado para agentes (Claude Code, Cursor, Codex…) trabalharem gastando poucos tokens:
+
+| Peça | O que faz |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md) | Regras invioláveis, comandos e mapa do projeto |
+| [`docs/`](docs/README.md) | Convenções por assunto, arquitetura, glossário e ADRs |
+| [`.mcp.json`](.mcp.json) | MCP **codegraph** (grafo de código), **Serena** (navegação/edição por símbolo) e **barber-docs** (RAG local) |
+| `npm run rag -- "pergunta"` | Busca BM25 local em docs + código, sem API paga |
+| [`.claude/`](.claude) | Permissões, hook de início de sessão, subagentes (`explorer`, `tenancy-reviewer`, `test-writer`) e comandos (`/context`, `/feature`, `/check`, `/review`) |
+| [`.harness/features/`](.harness/features) | Fluxo de cada funcionalidade ligado às funções que o implementam (validado por teste) |
+
+Requisitos: Node 22+ e [uv](https://docs.astral.sh/uv/) (para o Serena). Guia: [docs/ai/agent-workflow.md](docs/ai/agent-workflow.md).
 
 ## Deploy em produção
 

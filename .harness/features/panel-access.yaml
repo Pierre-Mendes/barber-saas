@@ -1,0 +1,39 @@
+name: Painel da barbearia e níveis de acesso
+description: Dono, gerente, recepção e barbeiro acessam o painel conforme a matriz de permissões.
+conventions: [multi-tenancy, security, server-actions]
+
+entrypoints:
+  - route: /admin/[slug]
+    file: src/app/admin/[slug]/layout.tsx
+    symbol: PanelLayout
+
+stages:
+  - stage: guarda
+    description: Usuário logado + Membership nessa barbearia + permissão do papel (404 sem vínculo)
+    file: src/lib/auth/guards.ts
+    symbol: requirePanel
+
+  - stage: permissao
+    description: Matriz papel → permissão
+    file: src/lib/auth/permissions.ts
+    symbol: can
+
+  - stage: agenda_propria
+    description: Barbeiro só altera a própria agenda
+    file: src/lib/auth/guards.ts
+    symbol: canManageBarberSchedule
+
+  - stage: equipe
+    description: Gerente não cria nem altera dono/gerente; barbearia nunca fica sem dono
+    file: src/app/admin/[slug]/actions.ts
+    symbol: changeMemberRole
+    calls:
+      - { file: src/lib/auth/permissions.ts, symbol: assignableRoles }
+      - { file: src/lib/auth/permissions.ts, symbol: canManageMember }
+
+invariants:
+  - Toda página e action do painel chama requirePanel
+  - tenantId sempre do contexto, nunca do formulário
+
+tests:
+  - tests/tenancy-and-permissions.test.ts

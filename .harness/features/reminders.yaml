@@ -1,0 +1,39 @@
+name: Lembretes e notificações
+description: Lembrete 24h antes por e-mail (.ics) e Web Push, disparado por cron.
+conventions: [security]
+
+entrypoints:
+  - route: GET /api/cron/reminders
+    file: src/app/api/cron/reminders/route.ts
+    symbol: GET
+
+stages:
+  - stage: autorizar
+    description: Authorization Bearer CRON_SECRET
+    file: src/app/api/cron/reminders/route.ts
+    symbol: GET
+
+  - stage: selecionar_e_reservar
+    description: CONFIRMED nas próximas 24h sem reminderSentAt; marca antes de enviar (idempotente)
+    file: src/lib/notifications/index.ts
+    symbol: sendDueReminders
+
+  - stage: email
+    file: src/lib/notifications/templates.ts
+    symbol: bookingReminderEmail
+
+  - stage: push
+    description: Envia para todos os dispositivos; remove assinaturas expiradas (404/410)
+    file: src/lib/notifications/push.ts
+    symbol: sendPushToUser
+
+  - stage: inscrever_dispositivo
+    file: src/app/api/push/subscribe/route.ts
+    symbol: POST
+
+invariants:
+  - Não envia lembrete para quem reservou menos de 3h antes
+  - Execuções concorrentes do cron não duplicam lembretes
+
+tests:
+  - tests/calendar-and-marketplace.test.ts

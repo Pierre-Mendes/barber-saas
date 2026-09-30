@@ -1,0 +1,38 @@
+name: Vitrine do cliente
+description: Clientes logados veem todas as barbearias listadas, favoritas no topo, ordenadas por atendimentos.
+conventions: [multi-tenancy, ui]
+
+entrypoints:
+  - route: /
+    file: src/app/(platform)/page.tsx
+    symbol: HomePage
+  - route: /explore
+    file: src/app/(platform)/explore/page.tsx
+    symbol: ExplorePage
+
+stages:
+  - stage: exigir_login
+    description: A vitrine é só para quem tem conta
+    file: src/lib/auth/guards.ts
+    symbol: requireUser
+
+  - stage: consultar
+    description: Barbearias listadas (ou favoritadas pelo usuário), filtro por termo/categoria, contagem de COMPLETED
+    file: src/lib/marketplace/queries.ts
+    symbol: getMarketplaceShops
+
+  - stage: ordenar
+    description: Favoritas primeiro; depois atendimentos totais ("popular") ou do próprio cliente ("mine")
+    file: src/lib/marketplace/ranking.ts
+    symbol: rankBarbershops
+
+  - stage: favoritar
+    file: src/app/actions/customer.ts
+    symbol: toggleFavoriteAction
+
+invariants:
+  - Barbearias não têm acesso a esta tela nem à lista das outras
+  - listedInMarketplace é controlado pela plataforma, não pela barbearia
+
+tests:
+  - tests/calendar-and-marketplace.test.ts

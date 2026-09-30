@@ -1,0 +1,40 @@
+name: Cancelamento
+description: Cliente cancela dentro do prazo da barbearia; equipe cancela a qualquer momento (barbeiro só a própria agenda).
+conventions: [multi-tenancy, server-actions]
+
+entrypoints:
+  - component: detalhe do agendamento (cliente)
+    file: src/components/booking-item.tsx
+    symbol: CancelBookingDialog
+  - component: agenda do painel
+    file: src/app/admin/[slug]/page.tsx
+    symbol: AgendaPage
+
+stages:
+  - stage: cliente_cancela
+    description: Confere dono do agendamento e prazo minCancelHours
+    file: src/app/actions/customer.ts
+    symbol: cancelMyBookingAction
+    calls:
+      - { file: src/lib/booking/service.ts, symbol: cancelBooking }
+    errors:
+      CANCEL_TOO_LATE: fora do prazo da barbearia
+      NOT_FOUND: agendamento de outra pessoa (não revela existência)
+
+  - stage: equipe_cancela
+    description: requirePanel(schedule.manageOwn); barbeiro limitado ao próprio barberId
+    file: src/app/admin/[slug]/actions.ts
+    symbol: staffCancelBooking
+
+  - stage: notificar
+    description: E-mail com .ics METHOD:CANCEL (remove da agenda) + push
+    file: src/lib/notifications/index.ts
+    symbol: notifyBookingCancelled
+
+invariants:
+  - Só CONFIRMED pode ser cancelado
+  - O horário volta a ficar livre (a constraint ignora CANCELLED)
+
+tests:
+  - tests/booking.db.test.ts
+  - tests/calendar-and-marketplace.test.ts

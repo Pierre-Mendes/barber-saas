@@ -1,0 +1,45 @@
+name: Resolução da barbearia pelo host (white-label)
+description: Subdomínio, domínio próprio ou /t/<slug> levam à página da barbearia, sem marca da plataforma.
+conventions: [multi-tenancy, ui]
+
+entrypoints:
+  - route: "* (toda requisição)"
+    file: src/middleware.ts
+    symbol: middleware
+
+stages:
+  - stage: classificar_host
+    description: plataforma | subdomínio (slug válido e não reservado) | domínio próprio
+    file: src/lib/tenancy/host.ts
+    symbol: resolveHost
+
+  - stage: reescrever
+    description: Reescreve para /t/<chave> e marca x-tenant-rewrite (removido de requisições externas)
+    file: src/lib/tenancy/host.ts
+    symbol: tenantRouteKey
+
+  - stage: carregar
+    file: src/lib/tenancy/tenant.ts
+    symbol: getTenantByRouteKey
+
+  - stage: links_internos
+    description: Prefixo vazio no subdomínio, /t/<slug> no domínio da plataforma
+    file: src/lib/tenancy/tenant.ts
+    symbol: tenantBasePath
+
+  - stage: link_publico
+    description: URL que a barbearia divulga
+    file: src/lib/tenancy/urls.ts
+    symbol: tenantPublicUrlFor
+
+  - stage: cor_da_marca
+    description: --brand no :root (inclui Sheet/Dialog em portal)
+    file: src/components/brand-style.tsx
+    symbol: BrandStyle
+
+invariants:
+  - Sessão compartilhada só entre plataforma e subdomínios (cookie em .ROOT_DOMAIN)
+  - Nada em /t/[tenant] referencia a plataforma ou outras barbearias
+
+tests:
+  - tests/tenancy-and-permissions.test.ts

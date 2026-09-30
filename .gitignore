@@ -6,3 +6,6 @@ coverage
 .env.local
 *.tsbuildinfo
 next-env.d.ts
+
+# Índices locais de agentes (RAG / Serena)
+.rag

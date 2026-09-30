@@ -14,7 +14,11 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "vapid:generate": "web-push generate-vapid-keys",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "rag": "node scripts/rag/search.mjs",
+    "rag:rebuild": "node scripts/rag/search.mjs --rebuild",
+    "rag:mcp": "node scripts/rag/mcp-server.mjs",
+    "codegraph:sync": "npx -y @colbymchenry/codegraph@1 sync ."
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -42,6 +46,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.4",
     "@types/nodemailer": "^8.0.2",
