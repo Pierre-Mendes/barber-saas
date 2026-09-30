@@ -17,7 +17,10 @@
 ## Entradas
 - Tudo que vem do cliente passa por **zod** antes de uso (actions, rotas de API, `searchParams` relevantes).
 - Cores entram no CSS: só `#rrggbb` (validado no salvamento e de novo em `BrandStyle`).
-- URLs de imagem: `z.url()` ou caminho local; renderizadas com `<img>` (sem busca no servidor).
+- URLs de imagem: `z.url()` ou caminho local; renderizadas com `<img>` (sem otimizador do Next buscando hosts).
+- Upload: formato real por *magic bytes* (JPG/PNG/WebP/AVIF), até 5 MB, chave isolada por `tenantId`
+  ([cache-and-storage.md](cache-and-storage.md)).
+- Rate limit (Redis) no link mágico e nas reservas: `rateLimit` + `RATE_LIMITS`.
 - HTML de e-mail escapa todo dado do usuário (`escapeHtml` em `notifications/templates.ts`).
 
 ## Segredos e endpoints

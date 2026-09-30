@@ -2,8 +2,11 @@ import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  images: {
-    remotePatterns: [{ protocol: "https", hostname: "**" }],
+  experimental: {
+    serverActions: {
+      // Upload de imagens (limite da aplicação: 5 MB, validado em src/lib/storage/images.ts).
+      bodySizeLimit: "6mb",
+    },
   },
 }
 

@@ -1,9 +1,9 @@
 /**
  * Dados de demonstração: várias barbearias independentes, cada uma com
  * equipe, serviços, barbeiros, horários e histórico. Logins (link mágico via Mailpit):
- *   dono@navalha.dev       → dono da "Navalha de Ouro"
- *   recepcao@navalha.dev   → recepção da "Navalha de Ouro"
- *   ze@navalha.dev         → barbeiro (só vê a própria agenda)
+ *   dono@zebu.dev          → dono do "Zebu Barber Club"
+ *   recepcao@zebu.dev      → recepção do "Zebu Barber Club"
+ *   ze@zebu.dev            → barbeiro (só vê a própria agenda)
  *   dono@vintage.dev       → dono da "Vintage Barber"
  *   cliente@exemplo.dev    → cliente com histórico e uma favorita
  */
@@ -40,17 +40,17 @@ interface TenantSeed {
 
 const TENANTS: TenantSeed[] = [
   {
-    slug: "navalha",
-    name: "Navalha de Ouro",
-    address: "Av. Paulista, 1000 - Bela Vista, São Paulo",
+    slug: "zebu",
+    name: "Zebu Barber Club",
+    address: "Av. Leopoldino de Oliveira, 3100 - Centro, Uberaba - MG",
     color: "#d4a82f",
     cover: 3,
     description:
-      "Tradição de barbearia clássica com atendimento moderno. Cerveja gelada, café passado na hora e profissionais que entendem de estilo.",
+      "Barbearia raiz no coração de Uberaba. Café mineiro, pão de queijo e profissionais que entendem de estilo.",
     staff: [
-      { email: "dono@navalha.dev", name: "Carlos Mendes", role: "OWNER", isBarber: true },
-      { email: "recepcao@navalha.dev", name: "Júlia Souza", role: "RECEPTIONIST" },
-      { email: "ze@navalha.dev", name: "Zé Ricardo", role: "BARBER", isBarber: true },
+      { email: "dono@zebu.dev", name: "Carlos Mendes", role: "OWNER", isBarber: true },
+      { email: "recepcao@zebu.dev", name: "Júlia Souza", role: "RECEPTIONIST" },
+      { email: "ze@zebu.dev", name: "Zé Ricardo", role: "BARBER", isBarber: true },
     ],
     extraBarbers: ["Bruno Lima"],
     services: ["corte", "barba", "combo", "acabamento", "sobrancelha", "hidratacao"],
@@ -59,7 +59,7 @@ const TENANTS: TenantSeed[] = [
   {
     slug: "vintage",
     name: "Vintage Barber",
-    address: "Rua Augusta, 500 - Consolação, São Paulo",
+    address: "Rua Artur Machado, 450 - Centro, Uberaba - MG",
     color: "#e11d48",
     cover: 6,
     description: "Rock, cadeiras antigas e cortes clássicos. Especialistas em pompadour e barbas longas.",
@@ -71,7 +71,7 @@ const TENANTS: TenantSeed[] = [
   {
     slug: "corte-estilo",
     name: "Corte & Estilo",
-    address: "Rua Oscar Freire, 210 - Jardins, São Paulo",
+    address: "Av. Santos Dumont, 1200 - Santa Maria, Uberaba - MG",
     color: "#8b5cf6",
     cover: 1,
     description: "Visagismo e cortes na tendência. Ambiente climatizado e atendimento com hora marcada.",
@@ -81,13 +81,13 @@ const TENANTS: TenantSeed[] = [
     completed: 28,
   },
   {
-    slug: "barba-navalha",
-    name: "Barba & Navalha",
-    address: "Av. Brigadeiro Faria Lima, 1500 - Pinheiros, São Paulo",
+    slug: "barba-negra",
+    name: "Barba Negra",
+    address: "Av. Guilherme Ferreira, 880 - São Benedito, Uberaba - MG",
     color: "#16a34a",
     cover: 4,
     description: "Especialistas em barba: modelagem, pigmentação e tratamentos com óleos naturais.",
-    staff: [{ email: "dono@barbanavalha.dev", name: "Paulo Henrique", role: "OWNER", isBarber: true }],
+    staff: [{ email: "dono@barbanegra.dev", name: "Paulo Henrique", role: "OWNER", isBarber: true }],
     extraBarbers: [],
     services: ["barba", "combo", "acabamento", "massagem"],
     completed: 15,
@@ -95,7 +95,7 @@ const TENANTS: TenantSeed[] = [
   {
     slug: "dapper-den",
     name: "The Dapper Den",
-    address: "Rua dos Pinheiros, 800 - Pinheiros, São Paulo",
+    address: "Av. Fidélis Reis, 1500 - Fabrício, Uberaba - MG",
     color: "#0ea5e9",
     cover: 5,
     description: "Barbearia premium com sinuca, whisky e atendimento sem pressa.",
@@ -107,7 +107,7 @@ const TENANTS: TenantSeed[] = [
   {
     slug: "machado-tesoura",
     name: "Machado & Tesoura",
-    address: "Rua Harmonia, 120 - Vila Madalena, São Paulo",
+    address: "Rua Segismundo Mendes, 210 - Mercês, Uberaba - MG",
     color: "#f97316",
     cover: 7,
     description: "Estilo lenhador: barbas cheias, cortes com textura e atendimento raiz.",
@@ -119,7 +119,7 @@ const TENANTS: TenantSeed[] = [
   {
     slug: "estilo-urbano",
     name: "Estilo Urbano",
-    address: "Av. Rebouças, 2300 - Pinheiros, São Paulo",
+    address: "Av. Nelson Freire, 2300 - Estados Unidos, Uberaba - MG",
     color: "#6366f1",
     cover: 8,
     description: "Degradês, freestyle e desenhos. A barbearia da quebrada com padrão de salão.",
@@ -131,10 +131,10 @@ const TENANTS: TenantSeed[] = [
   {
     slug: "classica",
     name: "Barbearia Clássica",
-    address: "Rua XV de Novembro, 45 - Centro, São Paulo",
+    address: "Praça Rui Barbosa, 45 - Centro, Uberaba - MG",
     color: "#a8a29e",
     cover: 2,
-    description: "Desde 1978 no centro da cidade. Navalha, toalha quente e muita conversa boa.",
+    description: "Desde 1978 no centro de Uberaba. Navalha, toalha quente e muita conversa boa.",
     staff: [{ email: "dono@classica.dev", name: "Seu Antônio", role: "OWNER", isBarber: true }],
     extraBarbers: [],
     services: ["corte", "barba", "combo"],
@@ -159,7 +159,7 @@ async function seedTenant(input: TenantSeed) {
       primaryColor: input.color,
       bannerUrl: `/demo/covers/cover-${input.cover}.svg`,
       description: input.description,
-      phones: ["(11) 99999-0000", "(11) 3333-0000"],
+      phones: ["(34) 99999-0000", "(34) 3333-0000"],
     },
   })
   const services = await Promise.all(
@@ -233,12 +233,12 @@ async function main() {
 
   const client = await user("cliente@exemplo.dev", "Cliente Exemplo")
   if ((await db.booking.count({ where: { customer: { userId: client.id } } })) === 0) {
-    await seedHistory(tenants.get("navalha")!, 2, client.id)
+    await seedHistory(tenants.get("zebu")!, 2, client.id)
     await seedHistory(tenants.get("vintage")!, 5, client.id)
     await db.favorite.create({ data: { userId: client.id, tenantId: tenants.get("dapper-den")! } })
   }
 
-  console.log(`Seed concluído: ${TENANTS.length} barbearias (ex.: /t/navalha)`)
+  console.log(`Seed concluído: ${TENANTS.length} barbearias (ex.: /t/zebu)`)
 }
 
 main()

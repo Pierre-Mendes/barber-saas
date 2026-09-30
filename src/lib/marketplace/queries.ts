@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client"
 import type { BarbershopCardData } from "@/components/barbershop-item"
+import { cached, getVersion } from "@/lib/cache"
+import { cacheKeys, TTL, VERSION } from "@/lib/cache/keys"
 import { findCategory, tenantFallbackCover } from "@/lib/catalog"
 import { db } from "@/lib/db"
 import { tenantPublicUrlFor } from "@/lib/tenancy/urls"
@@ -20,6 +22,17 @@ interface Filters {
  * já ordenadas (favoritas no topo, depois por atendimentos concluídos).
  */
 export async function getMarketplaceShops(userId: string, filters: Filters = {}): Promise<MarketplaceShop[]> {
+  const [version, userVersion] = await Promise.all([
+    getVersion(VERSION.marketplace),
+    getVersion(VERSION.userMarketplace(userId)),
+  ])
+  const filterKey = JSON.stringify([filters.q?.trim().toLowerCase() ?? "", filters.category ?? "", filters.sort ?? "popular"])
+  return cached(cacheKeys.marketplace(version, userVersion, userId, filterKey), TTL.marketplace, () =>
+    loadMarketplaceShops(userId, filters),
+  )
+}
+
+async function loadMarketplaceShops(userId: string, filters: Filters): Promise<MarketplaceShop[]> {
   const term = filters.q?.trim()
   const category = findCategory(filters.category)
   const conditions: Prisma.TenantWhereInput[] = [

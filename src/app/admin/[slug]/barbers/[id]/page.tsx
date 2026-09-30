@@ -8,7 +8,9 @@ import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/input"
+import { ImageField } from "@/components/admin/image-field"
 import { canManageBarberSchedule, requirePanel } from "@/lib/auth/guards"
+import { isStorageConfigured } from "@/lib/storage"
 import { can, ROLE_LABELS } from "@/lib/auth/permissions"
 import { db } from "@/lib/db"
 import { formatDateTime, minutesToHHMM, WEEKDAY_LABELS } from "@/lib/scheduling/time"
@@ -70,9 +72,7 @@ export default async function BarberDetailPage({
                 <Field label="Nome">
                   <Input name="name" defaultValue={barber.name} />
                 </Field>
-                <Field label="Foto (URL)">
-                  <Input name="photoUrl" defaultValue={barber.photoUrl ?? ""} placeholder="https://…" />
-                </Field>
+                <ImageField label="Foto" fileName="photoFile" urlName="photoUrl" currentUrl={barber.photoUrl} uploadEnabled={isStorageConfigured()} />
                 <Field label="Bio" className="sm:col-span-2">
                   <Textarea name="bio" defaultValue={barber.bio} rows={2} />
                 </Field>

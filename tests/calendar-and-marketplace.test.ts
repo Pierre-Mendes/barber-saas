@@ -10,7 +10,7 @@ const event: CalendarEvent = {
   location: "Rua A, 10",
   startsAt: new Date("2026-10-05T12:00:00Z"),
   endsAt: new Date("2026-10-05T12:45:00Z"),
-  url: "https://navalha.barber.app/reserva/1",
+  url: "https://zebu.barber.app/reserva/1",
 }
 
 describe("calendar", () => {

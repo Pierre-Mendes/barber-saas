@@ -13,6 +13,8 @@ O cliente agenda em segundos, recebe lembrete por e-mail e no celular e salva o 
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
 ![Prisma](https://img.shields.io/badge/Prisma-6-2d3748?logo=prisma)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06b6d4?logo=tailwindcss&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-dc382d?logo=redis&logoColor=white)
+![MinIO](https://img.shields.io/badge/MinIO-S3-c72e49?logo=minio&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ed?logo=docker&logoColor=white)
 
 <img src="docs/screenshots/home-mobile.jpg" width="200" alt="Home do cliente" />
@@ -62,6 +64,7 @@ O cliente agenda em segundos, recebe lembrete por e-mail e no celular e salva o 
 - **Barbeiros com agenda individual:** expediente semanal com pausa para almoço, folgas/bloqueios e serviços
   que cada um realiza.
 - **Serviços** com preço, duração e imagem.
+- **Upload de imagens** (logo, capa, fotos dos barbeiros e dos serviços) direto do painel, com pré-visualização.
 - **Agenda do dia** com indicadores, filtro por barbeiro e ações (concluído, faltou, cancelar).
 - **Agendamento pelo balcão/telefone:** a recepção agenda pelo cliente, que recebe a confirmação por e-mail.
 - **Equipe e níveis de acesso:** dono, gerente, recepção e barbeiro.
@@ -74,6 +77,11 @@ O cliente agenda em segundos, recebe lembrete por e-mail e no celular e salva o 
 - **Sem agendamento duplicado:** constraint `EXCLUDE USING gist` no PostgreSQL impede horários sobrepostos
   para o mesmo barbeiro, mesmo com cliques simultâneos.
 - **Fuso horário correto** por barbearia, sem dependências externas.
+- **Cache no Redis** para a barbearia (resolvida em toda página white-label), horários livres e vitrine, com
+  invalidação imediata ao mudar a agenda ou a personalização. Se o Redis cair, tudo segue funcionando pelo banco.
+- **Rate limit** no login por link mágico (por e-mail, por IP e no próprio provedor) e nas reservas.
+- **Imagens em storage S3 (MinIO)**, validadas pelo conteúdo real (JPG, PNG, WebP, AVIF; SVG recusado), até 5 MB,
+  isoladas por barbearia.
 
 ## Telas
 
@@ -88,7 +96,7 @@ O cliente agenda em segundos, recebe lembrete por e-mail e no celular e salva o 
 
 **Painel da barbearia**
 
-<img src="docs/screenshots/admin-agenda-desktop.jpg" width="49%" /> <img src="docs/screenshots/admin-barbeiro.jpg" width="49%" />
+<img src="docs/screenshots/admin-agenda-com-reserva.jpg" width="49%" /> <img src="docs/screenshots/admin-barbeiro.jpg" width="49%" />
 <img src="docs/screenshots/admin-equipe.jpg" width="49%" /> <img src="docs/screenshots/admin-personalizacao.jpg" width="49%" />
 
 > A arte de demonstração (capas, ilustrações dos serviços e mapa) é própria, gerada por
@@ -103,14 +111,16 @@ e rotas de API para autenticação, `.ics`, Web Push e cron.
 flowchart LR
     subgraph Hosts
         A["seuapp.com.br<br/>(plataforma)"]
-        B["navalha.seuapp.com.br<br/>(subdomínio)"]
-        C["agenda.navalha.com.br<br/>(domínio próprio)"]
+        B["zebu.seuapp.com.br<br/>(subdomínio)"]
+        C["agenda.zebubarber.com.br<br/>(domínio próprio)"]
     end
     A & B & C --> M["middleware.ts<br/>resolve o host"]
     M -->|plataforma| P["/ · /explore · /bookings<br/>/admin · /onboarding"]
     M -->|barbearia| T["/t/[tenant]<br/>página white-label"]
     P & T --> S["Server Actions<br/>+ serviços de domínio"]
     S --> DB[("PostgreSQL")]
+    S <--> RD[("Redis<br/>cache + rate limit")]
+    S --> MO[("MinIO / S3<br/>imagens")]
     S --> N["Notificações"]
     N --> E["E-mail + .ics"]
     N --> W["Web Push"]
@@ -196,13 +206,15 @@ docker compose --profile seed run --rm seed   # dados de demonstração
 |---|---|
 | Aplicação | http://localhost:3000 |
 | Caixa de e-mail (Mailpit) | http://localhost:8025 |
+| Console do MinIO (imagens) | http://localhost:9001 (minioadmin/minioadmin) |
+| Redis | `localhost:6379` |
 | PostgreSQL | `localhost:5432` (postgres/postgres) |
 
 ### Opção 2: desenvolvimento
 
 ```bash
 cp .env.example .env
-docker compose up -d db mailpit       # só banco e e-mail
+docker compose up -d db redis minio minio-init mailpit   # serviços de apoio
 npm install
 npx prisma migrate dev
 npm run db:seed
@@ -211,17 +223,19 @@ npm run dev
 
 ### Contas de demonstração
 
+O seed cria 8 barbearias fictícias em **Uberaba-MG** (Zebu Barber Club, Vintage Barber, Barba Negra, The Dapper Den…).
+
 O login é por link mágico: digite o e-mail e abra o link no **Mailpit** (http://localhost:8025).
 
 | E-mail | Perfil |
 |---|---|
 | `cliente@exemplo.dev` | Cliente com histórico e uma barbearia favorita |
-| `dono@navalha.dev` | Dono da *Navalha de Ouro* (também atende) |
-| `recepcao@navalha.dev` | Recepção da *Navalha de Ouro* |
-| `ze@navalha.dev` | Barbeiro: vê só a própria agenda |
+| `dono@zebu.dev` | Dono do *Zebu Barber Club* (também atende) |
+| `recepcao@zebu.dev` | Recepção do *Zebu Barber Club* |
+| `ze@zebu.dev` | Barbeiro: vê só a própria agenda |
 | `dono@vintage.dev` | Dono da *Vintage Barber* |
 
-Páginas públicas: http://localhost:3000/t/navalha ou http://navalha.localhost:3000 (subdomínios de
+Páginas públicas: http://localhost:3000/t/zebu ou http://zebu.localhost:3000 (subdomínios de
 `localhost` funcionam no Chrome e no Firefox).
 
 ## Variáveis de ambiente
@@ -240,6 +254,12 @@ Páginas públicas: http://localhost:3000/t/navalha ou http://navalha.localhost:
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | | Habilita o login com Google |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | | Habilitam o Web Push |
 | `VAPID_SUBJECT` | | Contato do remetente do push (`mailto:…`) |
+| `REDIS_URL` | recomendada | Cache e rate limit. Sem ela, cache em memória do processo (só dev) |
+| `S3_ENDPOINT` | | Endpoint S3 (MinIO: `http://minio:9000`). Vazio = AWS S3 |
+| `S3_BUCKET` / `S3_REGION` | | Bucket das imagens (padrão `barber-media`) e região |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | | Credenciais do storage |
+| `S3_FORCE_PATH_STYLE` | | `true` para MinIO/SeaweedFS/Garage |
+| `STORAGE_PUBLIC_URL` | | URL pública das imagens (CDN em produção). Sem storage, o painel aceita só URL |
 
 ## Scripts
 
@@ -289,7 +309,7 @@ Páginas públicas: http://localhost:3000/t/navalha ou http://navalha.localhost:
 │       └── tenancy/               # host, URLs e resolução da barbearia
 ├── tests/                         # unitários + integração com Postgres
 ├── Dockerfile
-└── docker-compose.yml             # app, postgres, mailpit, cron, seed
+└── docker-compose.yml             # app, postgres, redis, minio, mailpit, cron, seed
 ```
 
 ## Testes e qualidade
@@ -297,6 +317,7 @@ Páginas públicas: http://localhost:3000/t/navalha ou http://navalha.localhost:
 ```bash
 npm test                     # unitários
 TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/barber_test npm test   # + integração
+TEST_REDIS_URL=redis://localhost:6379/15 TEST_S3_ENDPOINT=http://localhost:9000 npm test  # + Redis e MinIO
 ```
 
 Os testes cobrem:
@@ -346,7 +367,6 @@ Requisitos: Node 22+ e [uv](https://docs.astral.sh/uv/) (para o Serena). Guia: [
 - [ ] Login em domínios próprios (hoje o login compartilhado funciona nos subdomínios)
 - [ ] Painel do super admin (planos, suspensão, controle da vitrine)
 - [ ] Cobrança da assinatura (Asaas / Mercado Pago / Stripe) com limites por plano
-- [ ] Upload de imagens (hoje logo, capa e fotos são URLs)
 - [ ] Row Level Security no PostgreSQL como segunda camada de isolamento
 - [ ] Relatórios: faturamento por barbeiro, taxa de faltas, horários de pico
 - [ ] Avaliações dos atendimentos (alimentando a vitrine)

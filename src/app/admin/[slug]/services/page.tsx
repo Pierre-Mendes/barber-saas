@@ -6,7 +6,9 @@ import { SubmitButton } from "@/components/submit-button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Field, Input } from "@/components/ui/input"
+import { ImageField } from "@/components/admin/image-field"
 import { requirePanel } from "@/lib/auth/guards"
+import { isStorageConfigured } from "@/lib/storage"
 import { serviceFallbackImage } from "@/lib/catalog"
 import { db } from "@/lib/db"
 import { formatCurrency } from "@/lib/utils"
@@ -14,7 +16,7 @@ import { createService, updateService } from "../actions"
 
 type ServiceFormValues = { name: string; description: string; price: unknown; durationMinutes: number; imageUrl: string | null }
 
-function ServiceFields({ service }: { service?: ServiceFormValues }) {
+function ServiceFields({ service, uploadEnabled }: { service?: ServiceFormValues; uploadEnabled: boolean }) {
   return (
     <>
       <Field label="Nome">
@@ -31,9 +33,14 @@ function ServiceFields({ service }: { service?: ServiceFormValues }) {
       <Field label="Descrição">
         <Input name="description" defaultValue={service?.description} />
       </Field>
-      <Field label="Imagem (URL)" hint="Opcional. Sem imagem, usamos uma ilustração.">
-        <Input name="imageUrl" defaultValue={service?.imageUrl ?? ""} placeholder="https://…" />
-      </Field>
+      <ImageField
+        label="Imagem"
+        fileName="imageFile"
+        urlName="imageUrl"
+        currentUrl={service?.imageUrl}
+        uploadEnabled={uploadEnabled}
+        hint="Opcional. Sem imagem, usamos uma ilustração."
+      />
     </>
   )
 }
@@ -41,6 +48,7 @@ function ServiceFields({ service }: { service?: ServiceFormValues }) {
 export default async function ServicesPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: FlashParams }) {
   const { slug } = await params
   const ctx = await requirePanel(slug, "services.manage")
+  const uploadEnabled = isStorageConfigured()
   const services = await db.service.findMany({
     where: { tenantId: ctx.tenant.id },
     include: { _count: { select: { barbers: true } } },
@@ -53,7 +61,7 @@ export default async function ServicesPage({ params, searchParams }: { params: P
       <PageHeader title="Serviços" description="O que aparece para o cliente na sua página.">
         <FormSheet triggerLabel="Novo serviço" title="Novo serviço" description="Todos os barbeiros ativos passam a oferecer o serviço.">
           <form action={createService.bind(null, slug)} className="grid gap-4">
-            <ServiceFields />
+            <ServiceFields uploadEnabled={uploadEnabled} />
             <SubmitButton>Adicionar serviço</SubmitButton>
           </form>
         </FormSheet>
@@ -79,7 +87,7 @@ export default async function ServicesPage({ params, searchParams }: { params: P
               <div className="mt-auto pt-2">
                 <FormSheet edit triggerLabel="Editar" title={`Editar ${service.name}`}>
                   <form action={updateService.bind(null, slug, service.id)} className="grid gap-4">
-                    <ServiceFields service={service} />
+                    <ServiceFields service={service} uploadEnabled={uploadEnabled} />
                     <label className="flex items-center gap-2 text-sm">
                       <input type="checkbox" name="active" defaultChecked={service.active} className="size-4 accent-[var(--brand)]" /> Ativo
                     </label>

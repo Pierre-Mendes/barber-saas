@@ -1,0 +1,48 @@
+name: Upload de imagens (logo, capa, barbeiro, serviço)
+description: O painel envia imagens para storage compatível com S3 (MinIO no compose) e grava a URL pública.
+conventions: [cache-and-storage, multi-tenancy, security]
+
+entrypoints:
+  - component: campo de imagem com pré-visualização
+    file: src/components/admin/image-field.tsx
+    symbol: ImageField
+  - route: /admin/[slug]/settings
+    file: src/app/admin/[slug]/actions.ts
+    symbol: updateSettings
+
+stages:
+  - stage: guarda
+    file: src/lib/auth/guards.ts
+    symbol: requirePanel
+
+  - stage: arquivo_ou_url
+    description: Arquivo enviado vira upload; senão vale a URL digitada
+    file: src/app/admin/[slug]/actions.ts
+    symbol: uploadedOr
+
+  - stage: validar
+    description: Formato real por magic bytes (JPG, PNG, WebP, AVIF) e até 5 MB; SVG/GIF recusados
+    file: src/lib/storage/images.ts
+    symbol: validateImage
+
+  - stage: gravar
+    description: Chave tenants/<tenantId>/<tipo>/<uuid>.<ext>; cria bucket público na primeira vez
+    file: src/lib/storage/index.ts
+    symbol: storeTenantImage
+
+  - stage: limpar_antiga
+    description: Remove a imagem substituída, só se for da mesma barbearia
+    file: src/lib/storage/index.ts
+    symbol: removeTenantImage
+
+  - stage: invalidar_cache
+    file: src/lib/cache/keys.ts
+    symbol: invalidateTenant
+
+invariants:
+  - Uma barbearia nunca grava nem apaga objeto fora de tenants/<seu tenantId>/
+  - Sem storage configurado, o painel aceita só URL
+
+tests:
+  - tests/storage.test.ts
+  - tests/cache.test.ts

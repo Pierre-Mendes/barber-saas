@@ -18,7 +18,9 @@ npx vitest run tests/scheduling.test.ts                           # um arquivo
 | Permissões, papéis, host | `tests/tenancy-and-permissions.test.ts` |
 | Regras de agendamento, concorrência, isolamento | `tests/booking.db.test.ts` (Postgres real) |
 | `.ics`, e-mail, ranking | `tests/calendar-and-marketplace.test.ts` |
-| Catálogo, RAG | `tests/catalog.test.ts`, `tests/rag.test.ts` |
+| Cache, rate limit | `tests/cache.test.ts` (memória sempre; Redis com `TEST_REDIS_URL`) |
+| Upload de imagens | `tests/storage.test.ts` (validação sempre; MinIO/S3 com `TEST_S3_ENDPOINT`) |
+| Catálogo, RAG, harness | `tests/catalog.test.ts`, `tests/rag.test.ts`, `tests/harness.test.ts` |
 
 ## Regras
 - Todo bug corrigido ganha um teste que falhava antes.

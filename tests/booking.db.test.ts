@@ -34,7 +34,7 @@ describe.skipIf(!TEST_DATABASE_URL)("booking service (database)", async () => {
     await reset()
     const user = await db.user.create({ data: { email: "cliente@teste.com", name: "Cliente" } })
     const tenant = await db.tenant.create({
-      data: { slug: "navalha", name: "Navalha", timezone: SP, minCancelHours: 2, slotIntervalMinutes: 30 },
+      data: { slug: "zebu", name: "Zebu", timezone: SP, minCancelHours: 2, slotIntervalMinutes: 30 },
     })
     const other = await db.tenant.create({ data: { slug: "outra", name: "Outra" } })
     const service = await db.service.create({

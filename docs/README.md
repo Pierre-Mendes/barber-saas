@@ -13,6 +13,7 @@ que a tarefa pede.
 | [conventions/server-actions.md](conventions/server-actions.md) | Como escrever mutações (validação, guarda, retorno, notificação) |
 | [conventions/database.md](conventions/database.md) | Prisma, migrações, datas, dinheiro, constraints |
 | [conventions/ui.md](conventions/ui.md) | Componentes, tema, cor da barbearia, textos |
+| [conventions/cache-and-storage.md](conventions/cache-and-storage.md) | Redis (cache, rate limit) e imagens no S3/MinIO |
 | [conventions/security.md](conventions/security.md) | Autenticação, autorização, entradas, segredos |
 | [conventions/testing.md](conventions/testing.md) | O que testar, onde e como rodar |
 | [conventions/git.md](conventions/git.md) | Branches, commits e pull requests |

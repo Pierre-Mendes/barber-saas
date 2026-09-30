@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, Input } from "@/components/ui/input"
 import { requireUser } from "@/lib/auth/guards"
 import { isPrismaUniqueViolation } from "@/lib/booking/service"
+import { invalidateTenant } from "@/lib/cache/keys"
 import { db } from "@/lib/db"
 import { isValidSlug } from "@/lib/tenancy/host"
 
@@ -39,7 +40,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
     }
     const { name, slug, address, iAmBarber } = parsed.data
     try {
-      await db.tenant.create({
+      const tenant = await db.tenant.create({
         data: {
           name,
           slug,
@@ -50,6 +51,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
             : undefined,
         },
       })
+      // Remove um eventual "não encontrado" guardado no cache para esse slug.
+      await invalidateTenant(tenant)
     } catch (err) {
       if (isPrismaUniqueViolation(err)) {
         redirect(`/onboarding?error=${encodeURIComponent("Esse link já está em uso.")}`)

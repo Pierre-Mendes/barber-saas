@@ -12,7 +12,7 @@ describe("resolveHost", () => {
   })
 
   it("maps a subdomain to the barbershop slug", () => {
-    expect(resolveHost("Navalha.Barber.App", root)).toEqual({ kind: "subdomain", slug: "navalha" })
+    expect(resolveHost("Zebu.Barber.App", root)).toEqual({ kind: "subdomain", slug: "zebu" })
   })
 
   it("does not treat reserved or nested subdomains as barbershops", () => {
@@ -21,13 +21,13 @@ describe("resolveHost", () => {
   })
 
   it("treats any other host as a custom domain", () => {
-    const resolution = resolveHost("agenda.navalha.com.br", root)
-    expect(resolution).toEqual({ kind: "custom", domain: "agenda.navalha.com.br" })
-    expect(tenantRouteKey(resolution)).toBe("~agenda.navalha.com.br")
+    const resolution = resolveHost("agenda.zebubarber.com.br", root)
+    expect(resolution).toEqual({ kind: "custom", domain: "agenda.zebubarber.com.br" })
+    expect(tenantRouteKey(resolution)).toBe("~agenda.zebubarber.com.br")
   })
 
   it("works with localhost subdomains in development", () => {
-    expect(resolveHost("navalha.localhost:3000", "localhost:3000")).toEqual({ kind: "subdomain", slug: "navalha" })
+    expect(resolveHost("zebu.localhost:3000", "localhost:3000")).toEqual({ kind: "subdomain", slug: "zebu" })
     expect(resolveHost("localhost:3000", "localhost:3000")).toEqual({ kind: "platform" })
   })
 

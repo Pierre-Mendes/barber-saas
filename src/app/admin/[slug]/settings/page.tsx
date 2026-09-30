@@ -3,7 +3,9 @@ import { Flash, type FlashParams } from "@/components/flash"
 import { SubmitButton } from "@/components/submit-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, Input, Textarea } from "@/components/ui/input"
+import { ImageField } from "@/components/admin/image-field"
 import { requirePanel } from "@/lib/auth/guards"
+import { isStorageConfigured } from "@/lib/storage"
 import { tenantFallbackCover } from "@/lib/catalog"
 import { tenantPublicUrlFor } from "@/lib/tenancy/urls"
 import { updateSettings } from "../actions"
@@ -11,6 +13,7 @@ import { updateSettings } from "../actions"
 export default async function SettingsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: FlashParams }) {
   const { slug } = await params
   const { tenant } = await requirePanel(slug, "settings.manage")
+  const uploadEnabled = isStorageConfigured()
 
   return (
     <>
@@ -34,12 +37,8 @@ export default async function SettingsPage({ params, searchParams }: { params: P
             <Field label="Cor principal">
               <Input name="primaryColor" type="color" defaultValue={tenant.primaryColor} className="cursor-pointer" />
             </Field>
-            <Field label="Logo (URL)">
-              <Input name="logoUrl" defaultValue={tenant.logoUrl ?? ""} placeholder="https://…" />
-            </Field>
-            <Field label="Capa (URL)">
-              <Input name="bannerUrl" defaultValue={tenant.bannerUrl ?? ""} placeholder="https://…" />
-            </Field>
+            <ImageField label="Logo" fileName="logoFile" urlName="logoUrl" currentUrl={tenant.logoUrl} uploadEnabled={uploadEnabled} hint="Quadrada, até 5 MB (JPG, PNG, WebP ou AVIF)." />
+            <ImageField label="Capa" fileName="bannerFile" urlName="bannerUrl" currentUrl={tenant.bannerUrl} uploadEnabled={uploadEnabled} aspect="wide" hint="Horizontal (ex.: 1600×900), até 5 MB." />
             <Field label="Sobre nós" className="sm:col-span-2">
               <Textarea name="description" defaultValue={tenant.description} rows={3} />
             </Field>

@@ -1,4 +1,6 @@
 import { Prisma, type Booking, type BookingStatus } from "@prisma/client"
+import { cached, getVersion } from "@/lib/cache"
+import { cacheKeys, invalidateSchedule, TTL, VERSION } from "@/lib/cache/keys"
 import { db } from "@/lib/db"
 import { computeAvailableSlots } from "@/lib/scheduling/availability"
 import { addDays, localDayBounds, toLocalDate } from "@/lib/scheduling/time"
@@ -31,10 +33,25 @@ interface AvailabilityQuery {
   now?: Date
   /** Ignora este agendamento no cálculo (útil para remarcação). */
   ignoreBookingId?: string
+  /** Ignora o cache (validação na hora de gravar). */
+  fresh?: boolean
 }
 
-/** Horários livres de um barbeiro para um serviço em um dia. */
+/**
+ * Horários livres de um barbeiro para um serviço em um dia.
+ * Consultas "ao vivo" (sem `now` fixo) usam cache curto, invalidado a cada mudança de agenda;
+ * a gravação sempre revalida com `fresh: true`.
+ */
 export async function getAvailableSlots(query: AvailabilityQuery): Promise<Date[]> {
+  if (query.fresh || query.now || query.ignoreBookingId) {
+    return computeSlots(query)
+  }
+  const version = await getVersion(VERSION.schedule(query.tenantId))
+  const cacheKey = cacheKeys.slots(query.tenantId, version, query.barberId, query.serviceId, query.date)
+  return cached(cacheKey, TTL.slots, () => computeSlots(query))
+}
+
+async function computeSlots(query: AvailabilityQuery): Promise<Date[]> {
   const now = query.now ?? new Date()
   const [tenant, barber, service] = await Promise.all([
     db.tenant.findUnique({ where: { id: query.tenantId } }),
@@ -147,6 +164,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
     serviceId: service.id,
     date: localDate,
     now: input.now,
+    fresh: true,
   })
   if (!slots.some((slot) => slot.getTime() === input.startsAt.getTime())) {
     throw new BookingError("Esse horário não está mais disponível.", "SLOT_UNAVAILABLE")
@@ -155,7 +173,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   const customer = await findOrCreateCustomer(tenant.id, input.userId, input.customerName, input.customerPhone ?? null)
 
   try {
-    return await db.booking.create({
+    const booking = await db.booking.create({
       data: {
         tenantId: tenant.id,
         customerId: customer.id,
@@ -167,8 +185,12 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
         notes: input.notes ?? "",
       },
     })
+    await invalidateSchedule(tenant.id)
+    return booking
   } catch (error) {
     if (isOverlapViolation(error)) {
+      // O cache mostrou um horário que outra pessoa acabou de pegar: força recálculo.
+      await invalidateSchedule(tenant.id)
       throw new BookingError("Alguém acabou de reservar esse horário. Escolha outro.", "SLOT_TAKEN")
     }
     throw error
@@ -214,10 +236,12 @@ export async function cancelBooking(bookingId: string, actor: CancelActor, now: 
     throw new BookingError("Esse agendamento não pode mais ser cancelado.", "INVALID_STATUS")
   }
 
-  return db.booking.update({
+  const cancelled = await db.booking.update({
     where: { id: booking.id },
     data: { status: "CANCELLED", cancelledAt: now },
   })
+  await invalidateSchedule(booking.tenantId)
+  return cancelled
 }
 
 /** Equipe marca atendimento como concluído ou falta. */

@@ -6,8 +6,8 @@ os dois (o RAG usa a mesma lista em `scripts/rag/lib.mjs` → `GLOSSARY`).
 | Português | No código | Observação |
 |---|---|---|
 | Barbearia | `Tenant` | O cliente da plataforma (SaaS) |
-| Link / slug | `Tenant.slug` | `navalha` → `navalha.seuapp.com.br` |
-| Domínio próprio | `Tenant.customDomain` | `agenda.navalha.com.br` |
+| Link / slug | `Tenant.slug` | `zebu` → `zebu.seuapp.com.br` |
+| Domínio próprio | `Tenant.customDomain` | `agenda.zebubarber.com.br` |
 | Plataforma | *platform* | Telas fora de uma barbearia (home, vitrine, painel) |
 | Página white-label | `/t/[tenant]` | Página pública da barbearia |
 | Vitrine | *marketplace*, `/explore` | Só para clientes logados |
@@ -28,3 +28,6 @@ os dois (o RAG usa a mesma lista em `scripts/rag/lib.mjs` → `GLOSSARY`).
 | Notificação no celular | Web Push, `PushSubscription` | Sem WhatsApp |
 | Painel | `/admin/[slug]` | Gestão da barbearia |
 | Personalização | *settings* | Nome, cor, logo, capa, link, regras |
+| Cache | `src/lib/cache`, Redis | `cached`, versões, `invalidateSchedule` |
+| Limite de tentativas | *rate limit* | `rateLimit`, `RATE_LIMITS` |
+| Imagem / upload | `src/lib/storage`, S3/MinIO | `storeTenantImage`, `ImageField` |

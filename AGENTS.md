@@ -19,12 +19,15 @@ Detalhes: [docs/ai/agent-workflow.md](docs/ai/agent-workflow.md). Convenções: 
 - **White-label:** nada em `/t/[tenant]` mostra a plataforma ou outras barbearias.
 - **Entradas** validadas com zod; `tenantId` nunca vem do formulário.
 - **Datas** só via `src/lib/scheduling/time.ts`; dinheiro em `Decimal` + `formatCurrency`.
+- **Cache:** mudou agenda/barbeiro/serviço/regras → `invalidateSchedule(tenantId)`; mudou a barbearia →
+  `invalidateTenant`. Imagens só via `storeTenantImage` (valida conteúdo, isola por tenant).
+  → [cache-and-storage.md](docs/conventions/cache-and-storage.md)
 - **Sobreposição** de horários é garantida pela constraint `booking_no_overlap`: não remova.
 - Identificadores em inglês; UI, mensagens e comentários em português.
 
 ## Comandos
 ```bash
-npm run dev                      # app em http://localhost:3000 (precisa de db + mailpit: docker compose up -d db mailpit)
+npm run dev                      # app em http://localhost:3000 (docker compose up -d db redis minio minio-init mailpit)
 npm run lint && npm run typecheck
 npm test                         # unitários
 TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/barber_test npm test   # + integração

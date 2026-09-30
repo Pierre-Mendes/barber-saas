@@ -2,14 +2,25 @@ import NextAuth, { type NextAuthConfig } from "next-auth"
 import Google from "next-auth/providers/google"
 import Nodemailer from "next-auth/providers/nodemailer"
 import { PrismaAdapter } from "@auth/prisma-adapter"
+import { RATE_LIMITS, rateLimit } from "@/lib/cache/rate-limit"
 import { db } from "@/lib/db"
 import { env } from "@/lib/env"
 import { sessionCookieDomain } from "@/lib/tenancy/host"
+
+const defaultEmailProvider = Nodemailer({ server: env.smtpUrl, from: env.emailFrom })
 
 const providers: NextAuthConfig["providers"] = [
   Nodemailer({
     server: env.smtpUrl,
     from: env.emailFrom,
+    // Backstop do rate limit: vale também para chamadas diretas à API do Auth.js.
+    async sendVerificationRequest(params) {
+      const { ok } = await rateLimit("signin:provider", params.identifier, RATE_LIMITS.signInProvider)
+      if (!ok) {
+        throw new Error("Limite de links de acesso atingido para este e-mail.")
+      }
+      return defaultEmailProvider.sendVerificationRequest(params)
+    },
   }),
 ]
 

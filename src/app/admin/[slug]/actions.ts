@@ -8,9 +8,13 @@ import type { Role } from "@prisma/client"
 import { canManageBarberSchedule, requirePanel, type PanelContext } from "@/lib/auth/guards"
 import { assignableRoles, can, canManageMember } from "@/lib/auth/permissions"
 import { BookingError, cancelBooking, createBooking, isPrismaUniqueViolation, setBookingOutcome } from "@/lib/booking/service"
+import { bumpVersion } from "@/lib/cache"
+import { invalidateSchedule, invalidateTenant, VERSION } from "@/lib/cache/keys"
 import { db } from "@/lib/db"
 import { notifyBookingCancelled, notifyBookingConfirmed } from "@/lib/notifications"
 import { hhmmToMinutes, zonedToUtc } from "@/lib/scheduling/time"
+import type { ImageKind } from "@/lib/storage/images"
+import { fileFromForm, removeTenantImage, storeTenantImage, StorageError } from "@/lib/storage"
 import { isValidSlug } from "@/lib/tenancy/host"
 
 /** Volta para a página com uma mensagem (`?erro=` ou `?ok=`) exibida pelo painel. */
@@ -24,6 +28,32 @@ const imageRef = z.union([z.url(), z.string().regex(/^\/[\w\-./]+$/), z.literal(
 
 function text(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim()
+}
+
+/**
+ * Se o formulário trouxe um arquivo em `field`, envia ao storage e devolve a URL;
+ * senão devolve `fallback` (a URL digitada). Erro de validação volta como `?erro=`.
+ */
+async function uploadedOr(
+  ctx: PanelContext,
+  formData: FormData,
+  field: string,
+  kind: ImageKind,
+  fallback: string | null,
+  path: string,
+): Promise<string | null> {
+  const file = fileFromForm(formData, field)
+  if (!file) {
+    return fallback
+  }
+  try {
+    return await storeTenantImage(ctx.tenant.id, kind, file)
+  } catch (error) {
+    if (error instanceof StorageError) {
+      back(path, "erro", error.message)
+    }
+    throw error
+  }
 }
 
 /** Barbeiro só age na própria agenda; retorna o filtro a aplicar. */
@@ -51,6 +81,9 @@ export async function staffSetOutcome(slug: string, bookingId: string, status: "
   const ctx = await requirePanel(slug, "schedule.manageOwn")
   try {
     await setBookingOutcome(bookingId, status, { tenantId: ctx.tenant.id, barberId: ownBarberScope(ctx) })
+    if (status === "COMPLETED") {
+      await bumpVersion(VERSION.marketplace)
+    }
   } catch (error) {
     if (error instanceof BookingError) {
       back(returnTo, "erro", error.message)
@@ -143,12 +176,14 @@ export async function createService(slug: string, formData: FormData) {
   if (!parsed.success) {
     back(`/admin/${slug}/services`, "erro", "Dados do serviço inválidos.")
   }
+  const imageUrl = await uploadedOr(ctx, formData, "imageFile", "service", parsed.data.imageUrl || null, `/admin/${slug}/services`)
   const service = await db.service.create({
-    data: { ...parsed.data, imageUrl: parsed.data.imageUrl || null, tenantId: ctx.tenant.id },
+    data: { ...parsed.data, imageUrl, tenantId: ctx.tenant.id },
   })
   // Por padrão, todos os barbeiros ativos fazem o novo serviço.
   const barbers = await db.barber.findMany({ where: { tenantId: ctx.tenant.id, active: true }, select: { id: true } })
   await db.barberService.createMany({ data: barbers.map((b) => ({ barberId: b.id, serviceId: service.id })) })
+  await invalidateSchedule(ctx.tenant.id)
   back(`/admin/${slug}/services`, "ok", "Serviço criado.")
 }
 
@@ -158,10 +193,19 @@ export async function updateService(slug: string, serviceId: string, formData: F
   if (!parsed.success) {
     back(`/admin/${slug}/services`, "erro", "Dados do serviço inválidos.")
   }
-  await db.service.updateMany({
-    where: { id: serviceId, tenantId: ctx.tenant.id },
-    data: { ...parsed.data, imageUrl: parsed.data.imageUrl || null, active: formData.get("active") === "on" },
+  const current = await db.service.findFirst({ where: { id: serviceId, tenantId: ctx.tenant.id } })
+  if (!current) {
+    back(`/admin/${slug}/services`, "erro", "Serviço não encontrado.")
+  }
+  const imageUrl = await uploadedOr(ctx, formData, "imageFile", "service", parsed.data.imageUrl || null, `/admin/${slug}/services`)
+  await db.service.update({
+    where: { id: current.id },
+    data: { ...parsed.data, imageUrl, active: formData.get("active") === "on" },
   })
+  if (current.imageUrl !== imageUrl) {
+    await removeTenantImage(ctx.tenant.id, current.imageUrl)
+  }
+  await invalidateSchedule(ctx.tenant.id)
   back(`/admin/${slug}/services`, "ok", "Serviço atualizado.")
 }
 
@@ -184,6 +228,7 @@ export async function createBarber(slug: string, formData: FormData) {
       },
     },
   })
+  await invalidateSchedule(ctx.tenant.id)
   redirect(`/admin/${slug}/barbers/${barber.id}?ok=${encodeURIComponent("Barbeiro criado. Ajuste os horários.")}`)
 }
 
@@ -197,12 +242,13 @@ async function requireBarber(ctx: PanelContext, barberId: string) {
 
 export async function updateBarberProfile(slug: string, barberId: string, formData: FormData) {
   const ctx = await requirePanel(slug, "barbers.manage")
-  await requireBarber(ctx, barberId)
+  const current = await requireBarber(ctx, barberId)
   const path = `/admin/${slug}/barbers/${barberId}`
-  const photoUrl = text(formData, "photoUrl")
-  if (!imageRef.safeParse(photoUrl).success) {
+  const typedPhotoUrl = text(formData, "photoUrl")
+  if (!imageRef.safeParse(typedPhotoUrl).success) {
     back(path, "erro", "URL da foto inválida.")
   }
+  const photoUrl = await uploadedOr(ctx, formData, "photoFile", "barber", typedPhotoUrl || null, path)
   const userId = text(formData, "userId") || null
   if (userId) {
     const isMember = await db.membership.count({ where: { tenantId: ctx.tenant.id, userId } })
@@ -222,7 +268,7 @@ export async function updateBarberProfile(slug: string, barberId: string, formDa
         data: {
           name: text(formData, "name") || undefined,
           bio: text(formData, "bio"),
-          photoUrl: photoUrl || null,
+          photoUrl,
           active: formData.get("active") === "on",
           userId,
         },
@@ -236,6 +282,10 @@ export async function updateBarberProfile(slug: string, barberId: string, formDa
     }
     throw error
   }
+  if (current.photoUrl !== photoUrl) {
+    await removeTenantImage(ctx.tenant.id, current.photoUrl)
+  }
+  await invalidateSchedule(ctx.tenant.id)
   back(path, "ok", "Barbeiro atualizado.")
 }
 
@@ -274,6 +324,7 @@ export async function updateWorkingHours(slug: string, barberId: string, formDat
     db.workingHours.deleteMany({ where: { barberId } }),
     db.workingHours.createMany({ data: blocks }),
   ])
+  await invalidateSchedule(ctx.tenant.id)
   back(path, "ok", "Horários salvos.")
 }
 
@@ -300,6 +351,7 @@ export async function addTimeOff(slug: string, barberId: string, formData: FormD
     back(path, "erro", "O fim da folga precisa ser depois do início.")
   }
   await db.timeOff.create({ data: { barberId, startsAt, endsAt, reason: text(formData, "reason") } })
+  await invalidateSchedule(ctx.tenant.id)
   back(path, "ok", "Folga registrada. Agendamentos já existentes nesse período não foram cancelados.")
 }
 
@@ -310,6 +362,7 @@ export async function removeTimeOff(slug: string, barberId: string, timeOffId: s
     back(`/admin/${slug}/barbers/${barberId}`, "erro", "Você só pode alterar a sua agenda.")
   }
   await db.timeOff.deleteMany({ where: { id: timeOffId, barberId } })
+  await invalidateSchedule(ctx.tenant.id)
   revalidatePath(`/admin/${slug}/barbers/${barberId}`)
 }
 
@@ -425,14 +478,16 @@ export async function updateSettings(slug: string, formData: FormData) {
     back(path, "erro", parsed.error.issues[0]?.message ?? "Dados inválidos.")
   }
   const data = parsed.data
+  const logoUrl = await uploadedOr(ctx, formData, "logoFile", "logo", data.logoUrl || null, path)
+  const bannerUrl = await uploadedOr(ctx, formData, "bannerFile", "banner", data.bannerUrl || null, path)
   try {
     await db.tenant.update({
       where: { id: ctx.tenant.id },
       data: {
         ...data,
         customDomain: data.customDomain || null,
-        logoUrl: data.logoUrl || null,
-        bannerUrl: data.bannerUrl || null,
+        logoUrl,
+        bannerUrl,
         phones: data.phones.split(/[,;\n]/).map((p) => p.trim()).filter(Boolean),
       },
     })
@@ -442,5 +497,12 @@ export async function updateSettings(slug: string, formData: FormData) {
     }
     throw error
   }
+  if (ctx.tenant.logoUrl !== logoUrl) {
+    await removeTenantImage(ctx.tenant.id, ctx.tenant.logoUrl)
+  }
+  if (ctx.tenant.bannerUrl !== bannerUrl) {
+    await removeTenantImage(ctx.tenant.id, ctx.tenant.bannerUrl)
+  }
+  await invalidateTenant(ctx.tenant, { id: ctx.tenant.id, slug: data.slug, customDomain: data.customDomain || null })
   back(`/admin/${data.slug}/settings`, "ok", "Configurações salvas.")
 }

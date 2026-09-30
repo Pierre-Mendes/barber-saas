@@ -26,6 +26,8 @@ Regra de dependência: `app → components → lib`. Nada em `src/lib` importa d
 | `notifications/` | E-mail, Web Push e lembretes | `notifyBookingConfirmed`, `notifyBookingCancelled`, `sendDueReminders` |
 | `calendar/` | `.ics` e links do Google/Outlook | `buildIcs`, `googleCalendarUrl` |
 | `marketplace/` | Vitrine do cliente e ranking | `getMarketplaceShops`, `rankBarbershops` |
+| `cache/` | Cache Redis com invalidação por versão e rate limit (fail-open) | `cached`, `invalidateSchedule`, `invalidateTenant`, `rateLimit` |
+| `storage/` | Imagens em storage S3 (MinIO) com validação por magic bytes | `storeTenantImage`, `removeTenantImage`, `validateImage` |
 | `catalog.ts` | Categorias de serviço, arte padrão, nome da plataforma | `SERVICE_CATEGORIES`, `serviceFallbackImage` |
 
 ## Fluxo de uma requisição
@@ -53,6 +55,7 @@ Regra de dependência: `app → components → lib`. Nada em `src/lib` importa d
 
 ## Infraestrutura
 
-- `docker-compose.yml`: `app`, `db` (Postgres 16), `mailpit` (e-mail de dev), `cron` (lembretes), `seed`.
+- `docker-compose.yml`: `app`, `db` (Postgres 16), `redis` (cache/rate limit), `minio` + `minio-init` (imagens),
+  `mailpit` (e-mail de dev), `cron` (lembretes), `seed`.
 - `Dockerfile`: build *standalone*; aplica migrações ao iniciar.
 - CI (`.github/workflows/ci.yml`): lint → typecheck → testes (com Postgres) → build.

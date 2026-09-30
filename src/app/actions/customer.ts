@@ -4,6 +4,9 @@ import { after } from "next/server"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { currentUser } from "@/auth"
+import { bumpVersion } from "@/lib/cache"
+import { VERSION } from "@/lib/cache/keys"
+import { RATE_LIMITS, rateLimit } from "@/lib/cache/rate-limit"
 import { db } from "@/lib/db"
 import { BookingError, cancelBooking, createBooking, getAvailableSlots } from "@/lib/booking/service"
 import { notifyBookingCancelled, notifyBookingConfirmed } from "@/lib/notifications"
@@ -20,6 +23,7 @@ export async function toggleFavoriteAction(tenantId: string): Promise<void> {
   } else {
     await db.favorite.create({ data: { userId: user.id, tenantId } })
   }
+  await bumpVersion(VERSION.userMarketplace(user.id))
   revalidatePath("/")
   revalidatePath("/explore")
 }
@@ -60,6 +64,9 @@ export async function createBookingAction(input: z.infer<typeof createSchema>): 
   const parsed = createSchema.safeParse(input)
   if (!parsed.success) {
     return { ok: false, error: "Dados inválidos." }
+  }
+  if (!(await rateLimit("booking", user.id, RATE_LIMITS.booking)).ok) {
+    return { ok: false, error: "Muitas tentativas de reserva. Aguarde alguns minutos." }
   }
   try {
     const booking = await createBooking({

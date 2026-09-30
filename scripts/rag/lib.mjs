@@ -76,6 +76,16 @@ export const GLOSSARY = {
   login: ["auth", "signin"],
   sobreposicao: ["overlap"],
   duplicado: ["overlap"],
+  imagem: ["image", "storage", "upload"],
+  imagens: ["image", "storage", "upload"],
+  upload: ["storage", "image"],
+  foto: ["photo", "image"],
+  logo: ["logo", "image"],
+  capa: ["banner", "image"],
+  armazenamento: ["storage", "s3"],
+  cache: ["cache", "redis", "cached"],
+  limite: ["rate", "limit"],
+  tentativas: ["rate", "limit"],
 }
 
 function expandQuery(tokens) {
