@@ -20,9 +20,9 @@ Regra de dependência: `app → components → lib`. Nada em `src/lib` importa d
 | Módulo | Responsabilidade | Pontos de entrada |
 |---|---|---|
 | `tenancy/` | Descobrir a barbearia pelo host e montar URLs públicas | `resolveHost`, `getTenantByRouteKey`, `tenantPublicUrlFor` |
-| `auth/` | Permissões por papel e guardas de acesso | `can`, `requirePanel`, `requireUser`, `canManageBarberSchedule` |
+| `auth/` | Permissões por papel, guardas de acesso, senha e destino pós-login | `can`, `requirePanel`, `requireUser`, `hashPassword`, `landingPath` |
 | `scheduling/` | Horários livres e fuso horário (funções puras) | `computeAvailableSlots`, `zonedToUtc`, `toLocalDate` |
-| `booking/` | Criar, cancelar e concluir agendamentos | `getAvailableSlots`, `createBooking`, `cancelBooking`, `toBookingCard` |
+| `booking/` | Criar, cancelar e concluir agendamentos; regra de cancelamento | `getAvailableSlots`, `createBooking`, `cancelBooking`, `canCustomerCancel`, `toBookingCard` |
 | `notifications/` | E-mail, Web Push e lembretes | `notifyBookingConfirmed`, `notifyBookingCancelled`, `sendDueReminders` |
 | `calendar/` | `.ics` e links do Google/Outlook | `buildIcs`, `googleCalendarUrl` |
 | `marketplace/` | Vitrine do cliente e ranking | `getMarketplaceShops`, `rankBarbershops` |
@@ -50,7 +50,8 @@ Regra de dependência: `app → components → lib`. Nada em `src/lib` importa d
 | `/onboarding` | Cadastro de nova barbearia |
 | `/admin`, `/admin/[slug]/…` | Painel da barbearia |
 | `/t/[tenant]`, `/t/[tenant]/reserva/[id]`, `/t/[tenant]/agendamentos` | Página white-label |
-| `/login`, `/login/verificar` | Login neutro (sem marca da plataforma) |
+| `/login`, `/login/verificar` | Login neutro (sem marca da plataforma): senha, link por e-mail, Google, acesso rápido (dev) |
+| `/conta` | Nome, celular, foto e senha do usuário |
 | `/api/auth/*`, `/api/bookings/[id]/ics`, `/api/push/subscribe`, `/api/cron/reminders`, `/api/health` | API |
 
 ## Infraestrutura

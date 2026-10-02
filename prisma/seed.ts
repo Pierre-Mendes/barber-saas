@@ -1,13 +1,16 @@
 /**
  * Dados de demonstração: várias barbearias independentes, cada uma com
- * equipe, serviços, barbeiros, horários e histórico. Logins (link mágico via Mailpit):
+ * equipe, serviços, barbeiros, horários e histórico. Todos com a senha `barber123`
+ * (DEMO_PASSWORD) — e o login mostra atalhos de acesso rápido em desenvolvimento:
  *   dono@zebu.dev          → dono do "Zebu Barber Club"
  *   recepcao@zebu.dev      → recepção do "Zebu Barber Club"
  *   ze@zebu.dev            → barbeiro (só vê a própria agenda)
  *   dono@vintage.dev       → dono da "Vintage Barber"
  *   cliente@exemplo.dev    → cliente com histórico e uma favorita
  */
-import { PrismaClient, type Role } from "@prisma/client"
+import { PrismaClient, type CancellationPolicy, type Role } from "@prisma/client"
+import { hashPassword } from "../src/lib/auth/password"
+import { DEMO_PASSWORD } from "../src/lib/demo"
 
 const db = new PrismaClient()
 
@@ -36,6 +39,7 @@ interface TenantSeed {
   extraBarbers: string[]
   services: ServiceKey[]
   completed: number
+  cancellation?: { policy: CancellationPolicy; windowMinutes?: number }
 }
 
 const TENANTS: TenantSeed[] = [
@@ -67,6 +71,8 @@ const TENANTS: TenantSeed[] = [
     extraBarbers: ["Léo Martins"],
     services: ["corte", "barba", "combo", "massagem"],
     completed: 67,
+    // Exemplo da outra regra: o cliente tem 1 hora, depois de agendar, para cancelar online.
+    cancellation: { policy: "WINDOW_AFTER_BOOKING", windowMinutes: 60 },
   },
   {
     slug: "corte-estilo",
@@ -142,8 +148,16 @@ const TENANTS: TenantSeed[] = [
   },
 ]
 
+let demoPasswordHash: string | undefined
+
+/** Usuário de demonstração (e-mail já confirmado) com a senha padrão. Reexecutar o seed não troca senhas já definidas. */
 async function user(email: string, name: string) {
-  return db.user.upsert({ where: { email }, create: { email, name, emailVerified: new Date() }, update: {} })
+  demoPasswordHash ??= await hashPassword(DEMO_PASSWORD)
+  const existing = await db.user.findUnique({ where: { email } })
+  if (existing) {
+    return existing.passwordHash ? existing : db.user.update({ where: { id: existing.id }, data: { passwordHash: demoPasswordHash } })
+  }
+  return db.user.create({ data: { email, name, emailVerified: new Date(), passwordHash: demoPasswordHash } })
 }
 
 async function seedTenant(input: TenantSeed) {
@@ -160,6 +174,9 @@ async function seedTenant(input: TenantSeed) {
       bannerUrl: `/demo/covers/cover-${input.cover}.svg`,
       description: input.description,
       phones: ["(34) 99999-0000", "(34) 3333-0000"],
+      ...(input.cancellation
+        ? { cancellationPolicy: input.cancellation.policy, cancelWindowMinutes: input.cancellation.windowMinutes ?? 60 }
+        : {}),
     },
   })
   const services = await Promise.all(
@@ -198,10 +215,12 @@ async function seedTenant(input: TenantSeed) {
 async function seedHistory(tenantId: string, count: number, userId?: string) {
   const barbers = await db.barber.findMany({ where: { tenantId } })
   const services = await db.service.findMany({ where: { tenantId } })
-  const regular = userId ?? (await user(`frequente+${tenantId.slice(-6)}@exemplo.dev`, "Cliente Frequente")).id
+  const regular = userId
+    ? await db.user.findUniqueOrThrow({ where: { id: userId } })
+    : await user(`frequente+${tenantId.slice(-6)}@exemplo.dev`, "Cliente Frequente")
   const customer = await db.customer.upsert({
-    where: { tenantId_userId: { tenantId, userId: regular } },
-    create: { tenantId, userId: regular, name: userId ? "Cliente Exemplo" : "Cliente Frequente" },
+    where: { tenantId_userId: { tenantId, userId: regular.id } },
+    create: { tenantId, userId: regular.id, email: regular.email, name: userId ? "Cliente Exemplo" : "Cliente Frequente" },
     update: {},
   })
   for (let i = 1; i <= count; i++) {
@@ -232,13 +251,19 @@ async function main() {
   }
 
   const client = await user("cliente@exemplo.dev", "Cliente Exemplo")
+  // Garante a senha também em bancos criados por seeds antigos (sem senha).
+  for (const input of TENANTS) {
+    for (const member of input.staff) {
+      await user(member.email, member.name)
+    }
+  }
   if ((await db.booking.count({ where: { customer: { userId: client.id } } })) === 0) {
     await seedHistory(tenants.get("zebu")!, 2, client.id)
     await seedHistory(tenants.get("vintage")!, 5, client.id)
     await db.favorite.create({ data: { userId: client.id, tenantId: tenants.get("dapper-den")! } })
   }
 
-  console.log(`Seed concluído: ${TENANTS.length} barbearias (ex.: /t/zebu)`)
+  console.log(`Seed concluído: ${TENANTS.length} barbearias (ex.: /t/zebu). Senha das contas de demonstração: ${DEMO_PASSWORD}`)
 }
 
 main()

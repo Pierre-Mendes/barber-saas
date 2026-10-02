@@ -21,8 +21,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={inter.variable}>
-      <body className="min-h-screen font-sans">
+    // Extensões do navegador (tradutor, gerenciador de senhas…) adicionam atributos em <html>/<body>
+    // antes do React hidratar; isso não é erro do app.
+    <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
+      <body className="min-h-screen font-sans" suppressHydrationWarning>
         {children}
         <Toaster />
         <ServiceWorkerRegistration />

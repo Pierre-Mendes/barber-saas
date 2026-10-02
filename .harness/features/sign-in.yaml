@@ -1,0 +1,54 @@
+name: Login e conta
+description: >-
+  E-mail + senha (padrão), criar conta, link por e-mail (sem senha / esqueci a senha), Google opcional e
+  atalhos de demonstração em dev. Depois do login, quem é da equipe vai para o painel.
+conventions: [security, server-actions, ui]
+
+entrypoints:
+  - route: /login
+    file: src/app/login/page.tsx
+    symbol: LoginPage
+  - component: diálogo de login
+    file: src/components/sign-in-dialog.tsx
+    symbol: SignInDialogContent
+  - route: /conta
+    file: src/app/(platform)/conta/page.tsx
+    symbol: AccountPage
+
+stages:
+  - stage: senha
+    description: Provider "password" — zod, rate limit (e-mail e IP), verifyPassword em tempo constante
+    file: src/auth.ts
+    symbol: passwordCredentials
+    calls:
+      - { file: src/lib/auth/password.ts, symbol: verifyPassword }
+      - { file: src/app/actions/auth.ts, symbol: signInWithPasswordAction }
+
+  - stage: cadastro
+    description: Cria usuário com hash scrypt (e-mail não confirmado) e entra
+    file: src/app/actions/auth.ts
+    symbol: signUpAction
+
+  - stage: destino
+    description: Volta para a página de origem; da home, equipe vai para /admin (que escolhe o painel)
+    file: src/lib/auth/landing.ts
+    symbol: landingPath
+
+  - stage: ligar_reservas
+    description: events.signIn liga reservas feitas sem conta com o mesmo e-mail (só e-mail confirmado)
+    file: src/lib/booking/service.ts
+    symbol: linkGuestCustomers
+
+  - stage: conta
+    description: Nome, celular, foto (upload S3 em users/<id>/avatar) e definir/trocar senha
+    file: src/app/actions/account.ts
+    symbol: updateProfileAction
+
+invariants:
+  - Login por link/Google apaga senha definida antes da confirmação do e-mail
+  - Atalhos de demonstração só com env.demoLogins e só para DEMO_ACCOUNTS
+  - Redirecionamento pós-login só para caminho relativo (safeCallback)
+
+tests:
+  - tests/auth-and-policy.test.ts
+  - tests/booking.db.test.ts

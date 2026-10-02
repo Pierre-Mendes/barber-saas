@@ -24,4 +24,8 @@ export const env = {
   get cronSecret(): string | undefined {
     return process.env.CRON_SECRET || undefined
   },
+  /** Botões de acesso rápido às contas de demonstração no login. Ligado em dev; em produção só com DEMO_LOGINS=true. */
+  get demoLogins(): boolean {
+    return process.env.DEMO_LOGINS === "true" || (process.env.NODE_ENV !== "production" && process.env.DEMO_LOGINS !== "false")
+  },
 }

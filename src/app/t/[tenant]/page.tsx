@@ -7,13 +7,13 @@ import { ServiceItem, type ServiceItemData } from "@/components/service-item"
 import { TenantMenu } from "@/components/tenant-chrome"
 import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@/components/ui/button"
+import { signInOptions } from "@/lib/auth/options"
+import { describeCancellationPolicy } from "@/lib/booking/policy"
 import { serviceFallbackImage, tenantFallbackCover } from "@/lib/catalog"
 import { db } from "@/lib/db"
 import { addDays, toLocalDate } from "@/lib/scheduling/time"
 import { getTenantByRouteKey, tenantBasePath } from "@/lib/tenancy/tenant"
 import { formatCurrency } from "@/lib/utils"
-
-const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)
 
 export default async function TenantPage({ params }: { params: Promise<{ tenant: string }> }) {
   const tenant = await getTenantByRouteKey((await params).tenant)
@@ -121,12 +121,12 @@ export default async function TenantPage({ params }: { params: Promise<{ tenant:
           <ServiceItem
             key={service.id}
             service={service}
-            tenant={{ id: tenant.id, name: tenant.name, timeZone: tenant.timezone }}
+            tenant={{ id: tenant.id, name: tenant.name, timeZone: tenant.timezone, cancellationText: describeCancellationPolicy(tenant) }}
             today={today}
             lastDay={lastDay}
             basePath={basePath}
             isLoggedIn={Boolean(session?.user)}
-            googleEnabled={googleEnabled}
+            signInOptions={signInOptions()}
           />
         ))}
       </div>

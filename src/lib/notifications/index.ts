@@ -1,5 +1,6 @@
 import { db } from "@/lib/db"
 import { buildIcs, type CalendarEvent } from "@/lib/calendar/ics"
+import { describeCancellationPolicy } from "@/lib/booking/policy"
 import { tenantPublicUrlFor } from "@/lib/tenancy/urls"
 import { sendMail } from "./mailer"
 import { sendPushToUser } from "./push"
@@ -36,14 +37,34 @@ export function bookingCalendarEvent(booking: LoadedBooking): CalendarEvent {
     location: booking.tenant.address,
     startsAt: booking.startsAt,
     endsAt: booking.endsAt,
-    url: bookingManageUrl(booking),
+    // Sem o segredo: eventos de agenda podem ser compartilhados com outras pessoas.
+    url: bookingManageUrl({ ...booking, accessToken: null }),
     sequence: booking.status === "CANCELLED" ? 1 : 0,
     cancelled: booking.status === "CANCELLED",
   }
 }
 
-export function bookingManageUrl(booking: Pick<LoadedBooking, "id" | "tenant">): string {
-  return `${tenantPublicUrlFor(booking.tenant)}/reserva/${booking.id}`
+/** Link "ver ou cancelar". Leva o segredo da reserva, então funciona sem login (quem agendou sem conta). */
+export function bookingManageUrl(booking: Pick<LoadedBooking, "id" | "tenant" | "accessToken">): string {
+  const base = `${tenantPublicUrlFor(booking.tenant)}/reserva/${booking.id}`
+  return booking.accessToken ? `${base}?token=${encodeURIComponent(booking.accessToken)}` : base
+}
+
+/** E-mail do cliente: o informado na reserva ou o da conta. */
+export function customerEmail(booking: LoadedBooking): string | null {
+  return booking.customer.email ?? booking.customer.user?.email ?? null
+}
+
+/** Envia ao cliente: e-mail sempre que houver; push só para quem tem conta. */
+function toCustomer(booking: LoadedBooking, email: () => Promise<unknown>, push: () => Promise<unknown>): Promise<unknown>[] {
+  const tasks: Promise<unknown>[] = []
+  if (customerEmail(booking)) {
+    tasks.push(email())
+  }
+  if (booking.customer.userId) {
+    tasks.push(push())
+  }
+  return tasks
 }
 
 function messageContext(booking: LoadedBooking): BookingMessageContext {
@@ -55,6 +76,7 @@ function messageContext(booking: LoadedBooking): BookingMessageContext {
     barberName: booking.barber.name,
     serviceName: booking.service.name,
     price: currency.format(Number(booking.price)),
+    cancellationText: describeCancellationPolicy(booking.tenant),
     address: booking.tenant.address,
     startsAt: booking.startsAt,
     manageUrl: bookingManageUrl(booking),
@@ -86,10 +108,11 @@ export async function notifyBookingConfirmed(bookingId: string): Promise<void> {
     return
   }
   const ctx = messageContext(booking)
-  const tasks: Promise<unknown>[] = [
-    sendMail({ to: booking.customer.user.email, ...bookingConfirmedEmail(ctx), attachments: [icsAttachment(booking)] }),
-    sendPushToUser(booking.customer.userId, bookingPush("confirmed", ctx)),
-  ]
+  const tasks = toCustomer(
+    booking,
+    () => sendMail({ to: customerEmail(booking)!, ...bookingConfirmedEmail(ctx), attachments: [icsAttachment(booking)] }),
+    () => sendPushToUser(booking.customer.userId!, bookingPush("confirmed", ctx)),
+  )
   if (booking.barber.user?.email) {
     tasks.push(
       sendMail({ to: booking.barber.user.email, ...staffNewBookingEmail(ctx), attachments: [icsAttachment(booking)] }),
@@ -105,10 +128,11 @@ export async function notifyBookingCancelled(bookingId: string): Promise<void> {
     return
   }
   const ctx = messageContext(booking)
-  const tasks: Promise<unknown>[] = [
-    sendMail({ to: booking.customer.user.email, ...bookingCancelledEmail(ctx), attachments: [icsAttachment(booking)] }),
-    sendPushToUser(booking.customer.userId, bookingPush("cancelled", ctx)),
-  ]
+  const tasks = toCustomer(
+    booking,
+    () => sendMail({ to: customerEmail(booking)!, ...bookingCancelledEmail(ctx), attachments: [icsAttachment(booking)] }),
+    () => sendPushToUser(booking.customer.userId!, bookingPush("cancelled", ctx)),
+  )
   if (booking.barber.user) {
     tasks.push(sendPushToUser(booking.barber.user.id, bookingPush("cancelled", ctx)))
   }
@@ -151,10 +175,13 @@ export async function sendDueReminders(now: Date = new Date()): Promise<number> 
       continue
     }
     const ctx = messageContext(booking)
-    await deliverAll([
-      sendMail({ to: booking.customer.user.email, ...bookingReminderEmail(ctx), attachments: [icsAttachment(booking)] }),
-      sendPushToUser(booking.customer.userId, bookingPush("reminder", ctx)),
-    ])
+    await deliverAll(
+      toCustomer(
+        booking,
+        () => sendMail({ to: customerEmail(booking)!, ...bookingReminderEmail(ctx), attachments: [icsAttachment(booking)] }),
+        () => sendPushToUser(booking.customer.userId!, bookingPush("reminder", ctx)),
+      ),
+    )
     sent++
   }
   return sent

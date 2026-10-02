@@ -11,25 +11,36 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { toBookingCard } from "@/lib/booking/view"
 import { env } from "@/lib/env"
-import { loadBooking } from "@/lib/notifications"
+import { customerEmail, loadBooking } from "@/lib/notifications"
+import { formatDateTime } from "@/lib/scheduling/time"
 import { getTenantByRouteKey, tenantBasePath } from "@/lib/tenancy/tenant"
 
-export default async function BookingDetailPage({ params }: { params: Promise<{ tenant: string; id: string }> }) {
-  const { tenant: key, id } = await params
+/**
+ * Detalhes da reserva. Acesso pelo login (dono da reserva) ou pelo link do e-mail (`?token=`),
+ * que funciona para quem agendou sem conta.
+ */
+export default async function BookingDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tenant: string; id: string }>
+  searchParams: Promise<{ token?: string }>
+}) {
+  const [{ tenant: key, id }, { token }] = await Promise.all([params, searchParams])
   const tenant = await getTenantByRouteKey(key)
   if (!tenant) {
     notFound()
   }
   const basePath = await tenantBasePath(tenant)
-  const user = await currentUser()
-  if (!user) {
+  const [booking, user] = await Promise.all([loadBooking(id), currentUser()])
+  const viaToken = Boolean(token && booking?.accessToken && token === booking.accessToken)
+  if (!viaToken && !user) {
     redirect(`/login?callbackUrl=${encodeURIComponent(`${basePath}/reserva/${id}`)}`)
   }
-  const booking = await loadBooking(id)
-  if (!booking || booking.tenantId !== tenant.id || booking.customer.userId !== user.id) {
+  if (!booking || booking.tenantId !== tenant.id || (!viaToken && booking.customer.userId !== user?.id)) {
     notFound()
   }
-  const card = toBookingCard(booking)
+  const card = toBookingCard(booking, new Date(), viaToken ? token : undefined)
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${tenant.name} ${tenant.address}`)}`
 
   return (
@@ -43,7 +54,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
             </div>
             <h1 className="text-2xl font-bold">Reserva confirmada!</h1>
             <p className="text-sm text-muted-foreground">
-              Enviamos os detalhes para <b className="text-foreground">{booking.customer.user.email}</b>.
+              Enviamos os detalhes para <b className="text-foreground">{customerEmail(booking)}</b>.
             </p>
           </div>
         ) : (
@@ -76,7 +87,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
               <div className="space-y-2">
                 <p className="section-title mb-0">Lembretes</p>
                 <p className="text-sm text-muted-foreground">Você recebe um lembrete por e-mail um dia antes.</p>
-                <PushOptIn vapidPublicKey={env.vapidPublicKey} />
+                {user && <PushOptIn vapidPublicKey={env.vapidPublicKey} />}
               </div>
             </CardContent>
           </Card>
@@ -97,13 +108,27 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
 
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1" asChild>
-            <Link href={`${basePath}/agendamentos`}>Meus agendamentos</Link>
+            {user ? (
+              <Link href={`${basePath}/agendamentos`}>Meus agendamentos</Link>
+            ) : (
+              <Link href={basePath || "/"}>Agendar outro horário</Link>
+            )}
           </Button>
-          {card.canCancel && <CancelBookingDialog bookingId={card.id} className="flex-1" />}
+          {card.canCancel && <CancelBookingDialog bookingId={card.id} token={viaToken ? token : undefined} className="flex-1" />}
         </div>
-        {card.isUpcoming && !card.canCancel && (
+        {card.isUpcoming && (
           <p className="text-center text-xs text-muted-foreground">
-            Cancelamento online só até {card.minCancelHours}h antes. Fale com a barbearia.
+            {card.canCancel && card.cancelDeadline
+              ? `Cancelamento online até ${formatDateTime(new Date(card.cancelDeadline), tenant.timezone, { dateStyle: "short", timeStyle: "short" })}.`
+              : card.cancelDeadline
+                ? "O prazo para cancelar online já passou. Fale com a barbearia."
+                : card.cancellationText}
+          </p>
+        )}
+        {!user && (
+          <p className="text-center text-xs text-muted-foreground">
+            Guarde o e-mail de confirmação: o link dele abre esta página. Criando uma conta com o mesmo e-mail, suas
+            reservas aparecem nela.
           </p>
         )}
       </main>

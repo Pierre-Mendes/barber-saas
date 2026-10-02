@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { ClockIcon } from "lucide-react"
+import { ClockIcon, InfoIcon } from "lucide-react"
 import { toast } from "sonner"
 import { createBookingAction, getSlotsAction } from "@/app/actions/customer"
 import { BookingSummary } from "@/components/booking-summary"
@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { Input, Label } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import type { SignInOptions } from "@/lib/auth/options"
 import { cn } from "@/lib/utils"
 
 export interface ServiceItemData {
@@ -28,16 +29,19 @@ export interface ServiceItemData {
 
 interface ServiceItemProps {
   service: ServiceItemData
-  tenant: { id: string; name: string; timeZone: string }
+  tenant: { id: string; name: string; timeZone: string; cancellationText: string }
   today: string
   lastDay: string
   basePath: string
   isLoggedIn: boolean
-  googleEnabled: boolean
+  signInOptions: SignInOptions
 }
 
-/** Card de serviço + painel "Fazer reserva" (profissional → dia → horário → confirmar). */
-export function ServiceItem({ service, tenant, today, lastDay, basePath, isLoggedIn, googleEnabled }: ServiceItemProps) {
+/**
+ * Card de serviço + painel "Fazer reserva" (profissional → dia → horário → confirmar).
+ * Sem login dá para agendar só com nome e e-mail; o link de gestão vai por e-mail.
+ */
+export function ServiceItem({ service, tenant, today, lastDay, basePath, isLoggedIn, signInOptions }: ServiceItemProps) {
   const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [signInOpen, setSignInOpen] = useState(false)
@@ -46,6 +50,8 @@ export function ServiceItem({ service, tenant, today, lastDay, basePath, isLogge
   const [slots, setSlots] = useState<string[] | null>(null)
   const [slot, setSlot] = useState<string | undefined>()
   const [phone, setPhone] = useState("")
+  const [guestName, setGuestName] = useState("")
+  const [guestEmail, setGuestEmail] = useState("")
   const [loadingSlots, startLoadingSlots] = useTransition()
   const [submitting, startSubmitting] = useTransition()
 
@@ -90,17 +96,17 @@ export function ServiceItem({ service, tenant, today, lastDay, basePath, isLogge
         serviceId: service.id,
         startsAt: slot,
         phone: phone || undefined,
+        guest: isLoggedIn ? undefined : { name: guestName, email: guestEmail },
       })
       if (result.ok) {
         toast.success("Reserva confirmada! Enviamos os detalhes para o seu e-mail.")
         setSheetOpen(false)
-        router.push(`${basePath}/reserva/${result.bookingId}`)
+        const token = result.manageToken ? `?token=${encodeURIComponent(result.manageToken)}` : ""
+        router.push(`${basePath}/reserva/${result.bookingId}${token}`)
         return
       }
       toast.error(result.error)
-      if (result.needsLogin) {
-        setSheetOpen(false)
-        setSignInOpen(true)
+      if (result.needsGuestInfo) {
         return
       }
       if (day) {
@@ -128,7 +134,7 @@ export function ServiceItem({ service, tenant, today, lastDay, basePath, isLogge
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => (isLoggedIn ? setSheetOpen(true) : setSignInOpen(true))}
+              onClick={() => setSheetOpen(true)}
             >
               Reservar
             </Button>
@@ -224,18 +230,67 @@ export function ServiceItem({ service, tenant, today, lastDay, basePath, isLogge
                   barbershopName: tenant.name,
                 }}
               />
+              {!isLoggedIn && (
+                <div className="space-y-3 rounded-xl border p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">Seus dados</p>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                      onClick={() => {
+                        setSheetOpen(false)
+                        setSignInOpen(true)
+                      }}
+                    >
+                      Já tenho conta
+                    </Button>
+                  </div>
+                  <div>
+                    <Label htmlFor={`guest-name-${service.id}`}>Nome</Label>
+                    <Input
+                      id={`guest-name-${service.id}`}
+                      value={guestName}
+                      onChange={(event) => setGuestName(event.target.value)}
+                      autoComplete="name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`guest-email-${service.id}`}>E-mail</Label>
+                    <Input
+                      id={`guest-email-${service.id}`}
+                      type="email"
+                      value={guestEmail}
+                      onChange={(event) => setGuestEmail(event.target.value)}
+                      autoComplete="email"
+                      placeholder="Para receber a confirmação"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Não precisa criar conta. O link para ver ou cancelar vai por e-mail.</p>
+                </div>
+              )}
               <Input
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 placeholder="Seu celular (opcional)"
                 inputMode="tel"
+                autoComplete="tel"
                 aria-label="Celular"
               />
+              <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <InfoIcon className="mt-px size-3.5 shrink-0" /> {tenant.cancellationText}
+              </p>
             </div>
           )}
 
           <SheetFooter>
-            <Button className="w-full" onClick={confirm} disabled={!slot || submitting}>
+            <Button
+              className="w-full"
+              onClick={confirm}
+              disabled={!slot || submitting || (!isLoggedIn && (guestName.trim().length < 2 || !guestEmail.includes("@")))}
+            >
               {submitting ? "Confirmando…" : "Confirmar"}
             </Button>
           </SheetFooter>
@@ -244,7 +299,7 @@ export function ServiceItem({ service, tenant, today, lastDay, basePath, isLogge
 
       <Dialog open={signInOpen} onOpenChange={setSignInOpen}>
         <DialogContent>
-          <SignInDialogContent googleEnabled={googleEnabled} />
+          <SignInDialogContent options={signInOptions} />
         </DialogContent>
       </Dialog>
     </>

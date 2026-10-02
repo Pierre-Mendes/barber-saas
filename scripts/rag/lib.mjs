@@ -86,6 +86,11 @@ export const GLOSSARY = {
   cache: ["cache", "redis", "cached"],
   limite: ["rate", "limit"],
   tentativas: ["rate", "limit"],
+  senha: ["password", "credentials"],
+  visitante: ["guest", "token"],
+  conta: ["account", "user"],
+  prazo: ["policy", "deadline"],
+  regra: ["policy", "rules"],
 }
 
 function expandQuery(tokens) {

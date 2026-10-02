@@ -14,7 +14,15 @@ export const RATE_LIMITS = {
   signInIp: { limit: 20, windowSeconds: 15 * 60 },
   /** Backstop no próprio provider de e-mail (cobre chamadas diretas à API do Auth.js). */
   signInProvider: { limit: 10, windowSeconds: 15 * 60 },
-  /** Reservas por usuário. */
+  /** Tentativas de login com senha por e-mail (força bruta). */
+  signInPassword: { limit: 10, windowSeconds: 15 * 60 },
+  /** Tentativas de login com senha por IP. */
+  signInPasswordIp: { limit: 40, windowSeconds: 15 * 60 },
+  /** Contas criadas por IP. */
+  signUpIp: { limit: 5, windowSeconds: 60 * 60 },
+  /** Reservas sem conta por IP (além do limite por e-mail em `booking`). */
+  guestBookingIp: { limit: 10, windowSeconds: 60 * 60 },
+  /** Reservas por usuário (ou e-mail, para quem agenda sem conta). */
   booking: { limit: 10, windowSeconds: 10 * 60 },
 } satisfies Record<string, RateLimitRule>
 

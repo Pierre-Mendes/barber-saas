@@ -3,6 +3,7 @@
 import Link from "next/link"
 import {
   CalendarIcon,
+  CircleUserIcon,
   HomeIcon,
   LayoutDashboardIcon,
   LogInIcon,
@@ -17,6 +18,7 @@ import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import type { SignInOptions } from "@/lib/auth/options"
 import { SERVICE_CATEGORIES } from "@/lib/catalog"
 
 const ICONS = {
@@ -25,6 +27,7 @@ const ICONS = {
   panel: LayoutDashboardIcon,
   store: StoreIcon,
   search: SearchIcon,
+  account: CircleUserIcon,
 }
 
 export interface MenuLink {
@@ -38,13 +41,13 @@ interface AppMenuProps {
   links: MenuLink[]
   /** Mostra os atalhos de categorias (só na plataforma, nunca na página da barbearia). */
   showCategories?: boolean
-  googleEnabled: boolean
+  signInOptions: SignInOptions
   signOutAction: () => Promise<void>
   triggerClassName?: string
 }
 
 /** Menu lateral (como no projeto base): usuário, navegação, categorias e sair. */
-export function AppMenu({ user, links, showCategories, googleEnabled, signOutAction, triggerClassName }: AppMenuProps) {
+export function AppMenu({ user, links, showCategories, signInOptions, signOutAction, triggerClassName }: AppMenuProps) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -76,7 +79,7 @@ export function AppMenu({ user, links, showCategories, googleEnabled, signOutAct
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
-                  <SignInDialogContent googleEnabled={googleEnabled} />
+                  <SignInDialogContent options={signInOptions} />
                 </DialogContent>
               </Dialog>
             </>

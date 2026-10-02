@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { BellRingIcon, CalendarPlusIcon, ShieldCheckIcon, StoreIcon, UsersIcon } from "lucide-react"
+import { BellRingIcon, CalendarPlusIcon, LayoutDashboardIcon, ShieldCheckIcon, StoreIcon, UsersIcon } from "lucide-react"
 import { auth } from "@/auth"
 import { BarbershopItem } from "@/components/barbershop-item"
 import { BookingItem } from "@/components/booking-item"
@@ -8,14 +8,15 @@ import { HorizontalList } from "@/components/horizontal-list"
 import { QuickSearch } from "@/components/quick-search"
 import { SearchBar } from "@/components/search-bar"
 import { SignInButton } from "@/components/sign-in-button"
+import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { signInOptions } from "@/lib/auth/options"
+import { ROLE_LABELS } from "@/lib/auth/permissions"
 import { bookingCardInclude, toBookingCard } from "@/lib/booking/view"
 import { PLATFORM_NAME } from "@/lib/catalog"
 import { db } from "@/lib/db"
 import { getMarketplaceShops } from "@/lib/marketplace/queries"
-
-const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)
 
 function Greeting({ name }: { name?: string | null }) {
   const today = new Intl.DateTimeFormat("pt-BR", {
@@ -39,13 +40,18 @@ export default async function HomePage() {
     return <Landing />
   }
 
-  const [shops, upcoming] = await Promise.all([
+  const [shops, upcoming, memberships] = await Promise.all([
     getMarketplaceShops(user.id),
     db.booking.findMany({
       where: { customer: { userId: user.id }, status: "CONFIRMED", endsAt: { gte: new Date() } },
       include: bookingCardInclude,
       orderBy: { startsAt: "asc" },
       take: 10,
+    }),
+    db.membership.findMany({
+      where: { userId: user.id, tenant: { active: true } },
+      include: { tenant: true },
+      orderBy: { tenant: { name: "asc" } },
     }),
   ])
   const favorites = shops.filter((shop) => shop.isFavorite)
@@ -57,6 +63,24 @@ export default async function HomePage() {
   return (
     <div>
       <Greeting name={user.name} />
+      {memberships.length > 0 && (
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
+          {memberships.map((m) => (
+            <Link key={m.id} href={`/admin/${m.tenant.slug}`}>
+              <Card className="flex items-center gap-4 border-primary/40 p-4 transition hover:border-primary">
+                <UserAvatar name={m.tenant.name} image={m.tenant.logoUrl} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">Você trabalha aqui · {ROLE_LABELS[m.role]}</p>
+                  <p className="truncate font-semibold">{m.tenant.name}</p>
+                </div>
+                <span className="flex items-center gap-1 text-sm font-semibold text-primary">
+                  <LayoutDashboardIcon className="size-4" /> Abrir painel
+                </span>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
       <div className="mt-6">
         <SearchBar />
       </div>
@@ -124,7 +148,7 @@ function Landing() {
             Encontre barbearias, salve suas favoritas e agende com o profissional que você prefere.
           </p>
           <div className="flex flex-wrap gap-3">
-            <SignInButton googleEnabled={googleEnabled} size="lg" callbackUrl="/">
+            <SignInButton signInOptions={signInOptions()} size="lg" callbackUrl="/">
               Entrar ou criar conta
             </SignInButton>
             <Button size="lg" variant="outline" asChild>

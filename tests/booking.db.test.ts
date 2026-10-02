@@ -10,7 +10,7 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
 describe.skipIf(!TEST_DATABASE_URL)("booking service (database)", async () => {
   process.env.DATABASE_URL = TEST_DATABASE_URL
   const { db } = await import("@/lib/db")
-  const { BookingError, cancelBooking, createBooking, getAvailableSlots } = await import("@/lib/booking/service")
+  const { BookingError, cancelBooking, createBooking, getAvailableSlots, linkGuestCustomers } = await import("@/lib/booking/service")
   const { zonedToUtc } = await import("@/lib/scheduling/time")
 
   const SP = "America/Sao_Paulo"
@@ -54,14 +54,15 @@ describe.skipIf(!TEST_DATABASE_URL)("booking service (database)", async () => {
   const book = (minute: number, overrides: Partial<Parameters<typeof createBooking>[0]> = {}) =>
     createBooking({
       tenantId: ids.tenantId,
-      userId: ids.userId,
+      customer: { kind: "user", userId: ids.userId, email: "cliente@teste.com", name: "Cliente" },
       barberId: ids.barberId,
       serviceId: ids.serviceId,
       startsAt: zonedToUtc(DAY, minute, SP),
-      customerName: "Cliente",
       now,
       ...overrides,
     })
+
+  const guest = (email = "visitante@teste.com") => ({ kind: "guest" as const, email, name: "Visitante" })
 
   it("books a free slot and removes it from availability", async () => {
     const before = await getAvailableSlots({ ...ids, date: DAY, now })
@@ -108,6 +109,57 @@ describe.skipIf(!TEST_DATABASE_URL)("booking service (database)", async () => {
 
     await cancelBooking(booking.id, { kind: "customer", userId: ids.userId }, now)
     await expect(book(9 * 60)).resolves.toBeTruthy()
+  })
+
+  it("books without an account and reuses the guest record by e-mail", async () => {
+    const first = await book(9 * 60, { customer: guest("Visitante@Teste.com") })
+    await book(10 * 60, { customer: { ...guest(), phone: "34999990000" } })
+    const customers = await db.customer.findMany({ where: { tenantId: ids.tenantId } })
+    expect(customers).toHaveLength(1)
+    expect(customers[0]).toMatchObject({ userId: null, email: "visitante@teste.com", phone: "34999990000" })
+    expect(first.accessToken).toMatch(/^[\w-]{32}$/)
+  })
+
+  it("cancels with the e-mail link token and rejects a wrong token", async () => {
+    const booking = await book(9 * 60, { customer: guest() })
+    await expect(cancelBooking(booking.id, { kind: "token", token: "errado" }, now)).rejects.toMatchObject({ code: "NOT_FOUND" })
+    await expect(cancelBooking(booking.id, { kind: "token", token: booking.accessToken! }, now)).resolves.toMatchObject({
+      status: "CANCELLED",
+    })
+  })
+
+  it("links guest bookings to the account with the same e-mail", async () => {
+    await book(9 * 60, { customer: guest("cliente@teste.com") })
+    expect(await linkGuestCustomers(ids.userId, "CLIENTE@teste.com")).toBe(1)
+    // A próxima reserva logada usa o mesmo registro (não duplica o cliente).
+    await book(10 * 60)
+    const customers = await db.customer.findMany({ where: { tenantId: ids.tenantId } })
+    expect(customers).toHaveLength(1)
+    expect(customers[0].userId).toBe(ids.userId)
+  })
+
+  it("enforces the 'window after booking' cancellation policy", async () => {
+    await db.tenant.update({ where: { id: ids.tenantId }, data: { cancellationPolicy: "WINDOW_AFTER_BOOKING", cancelWindowMinutes: 60 } })
+    const late = await book(9 * 60)
+    const afterWindow = new Date(late.createdAt.getTime() + 61 * 60_000)
+    await expect(cancelBooking(late.id, { kind: "customer", userId: ids.userId }, afterWindow)).rejects.toMatchObject({
+      code: "CANCEL_TOO_LATE",
+    })
+    const withinWindow = new Date(late.createdAt.getTime() + 59 * 60_000)
+    await expect(cancelBooking(late.id, { kind: "customer", userId: ids.userId }, withinWindow)).resolves.toMatchObject({
+      status: "CANCELLED",
+    })
+  })
+
+  it("lets staff cancel even when the customer can't", async () => {
+    await db.tenant.update({ where: { id: ids.tenantId }, data: { cancellationPolicy: "NONE" } })
+    const booking = await book(9 * 60)
+    await expect(cancelBooking(booking.id, { kind: "customer", userId: ids.userId }, now)).rejects.toMatchObject({
+      code: "CANCEL_TOO_LATE",
+    })
+    await expect(cancelBooking(booking.id, { kind: "staff", tenantId: ids.tenantId }, now)).resolves.toMatchObject({
+      status: "CANCELLED",
+    })
   })
 
   it("keeps one customer record per barbershop", async () => {

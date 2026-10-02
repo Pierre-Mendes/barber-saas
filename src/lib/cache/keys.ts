@@ -15,8 +15,14 @@ export const VERSION = {
   userMarketplace: (userId: string) => `marketplace:user:${userId}`,
 }
 
+/**
+ * Versão do formato do `Tenant` guardado no cache. Suba quando o modelo ganhar campos:
+ * entradas antigas (sem os campos novos) deixam de ser lidas após o deploy.
+ */
+const TENANT_SHAPE = 2
+
 export const cacheKeys = {
-  tenantByRouteKey: (routeKey: string) => key("tenant", routeKey),
+  tenantByRouteKey: (routeKey: string) => key("tenant", `v${TENANT_SHAPE}`, routeKey),
   slots: (tenantId: string, version: number, barberId: string, serviceId: string, date: string) =>
     key("slots", tenantId, version, barberId, serviceId, date),
   marketplace: (version: number, userVersion: number, userId: string, filters: string) =>

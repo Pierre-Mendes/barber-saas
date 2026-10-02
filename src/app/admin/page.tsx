@@ -10,14 +10,15 @@ import { requireUser } from "@/lib/auth/guards"
 import { ROLE_LABELS } from "@/lib/auth/permissions"
 import { db } from "@/lib/db"
 
-export default async function AdminIndexPage() {
+export default async function AdminIndexPage({ searchParams }: { searchParams: Promise<{ todas?: string }> }) {
   const user = await requireUser("/admin")
+  const { todas } = await searchParams
   const memberships = await db.membership.findMany({
     where: { userId: user.id, tenant: { active: true } },
     include: { tenant: true },
     orderBy: { tenant: { name: "asc" } },
   })
-  if (memberships.length === 1) {
+  if (memberships.length === 1 && !todas) {
     redirect(`/admin/${memberships[0].tenant.slug}`)
   }
 

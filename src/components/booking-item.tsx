@@ -61,10 +61,13 @@ export function CalendarLinks({ calendar }: { calendar: BookingCardData["calenda
 
 export function CancelBookingDialog({
   bookingId,
+  token,
   onCancelled,
   className,
 }: {
   bookingId: string
+  /** Segredo do link do e-mail (quem agendou sem conta). */
+  token?: string
   onCancelled?: () => void
   className?: string
 }) {
@@ -94,7 +97,7 @@ export function CancelBookingDialog({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                const result = await cancelMyBookingAction(bookingId)
+                const result = await cancelMyBookingAction(bookingId, token)
                 if (!result.ok) {
                   toast.error(result.error ?? "Erro ao cancelar.")
                   return
@@ -189,7 +192,7 @@ export function BookingItem({ booking, className }: { booking: BookingCardData; 
 
           {booking.isUpcoming && !booking.canCancel && (
             <p className="text-xs text-muted-foreground">
-              Cancelamento online só até {booking.minCancelHours}h antes. Fale com a barbearia.
+              {booking.cancelDeadline ? "O prazo para cancelar online já passou. Fale com a barbearia." : booking.cancellationText}
             </p>
           )}
         </div>

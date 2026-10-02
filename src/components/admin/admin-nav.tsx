@@ -3,7 +3,9 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  ArrowLeftRightIcon,
   CalendarDaysIcon,
+  CircleUserIcon,
   ExternalLinkIcon,
   LogOutIcon,
   MenuIcon,
@@ -38,6 +40,8 @@ interface AdminNavProps {
   roleLabel: string
   publicUrl: string
   items: AdminNavItem[]
+  /** A pessoa faz parte de mais de uma barbearia. */
+  hasOtherPanels: boolean
   signOutAction: () => Promise<void>
 }
 
@@ -97,7 +101,7 @@ function PublicLink({ url }: { url: string }) {
 }
 
 /** Navegação do painel: barra lateral no desktop e menu em gaveta no celular. */
-export function AdminNav({ tenantName, logoUrl, roleLabel, publicUrl, items, signOutAction }: AdminNavProps) {
+export function AdminNav({ tenantName, logoUrl, roleLabel, publicUrl, items, hasOtherPanels, signOutAction }: AdminNavProps) {
   const brand = (
     <div className="flex items-center gap-3">
       <UserAvatar name={tenantName} image={logoUrl} />
@@ -108,11 +112,25 @@ export function AdminNav({ tenantName, logoUrl, roleLabel, publicUrl, items, sig
     </div>
   )
   const signOut = (
-    <form action={signOutAction}>
-      <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
-        <LogOutIcon className="size-[18px]" /> Sair
+    <div className="space-y-1">
+      {hasOtherPanels && (
+        <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" asChild>
+          <Link href="/admin?todas=1">
+            <ArrowLeftRightIcon className="size-[18px]" /> Trocar de barbearia
+          </Link>
+        </Button>
+      )}
+      <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" asChild>
+        <Link href="/conta">
+          <CircleUserIcon className="size-[18px]" /> Minha conta
+        </Link>
       </Button>
-    </form>
+      <form action={signOutAction}>
+        <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground">
+          <LogOutIcon className="size-[18px]" /> Sair
+        </Button>
+      </form>
+    </div>
   )
 
   return (

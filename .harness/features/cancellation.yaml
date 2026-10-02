@@ -1,5 +1,7 @@
 name: Cancelamento
-description: Cliente cancela dentro do prazo da barbearia; equipe cancela a qualquer momento (barbeiro só a própria agenda).
+description: >-
+  Cliente (logado ou pelo link do e-mail) cancela conforme a regra da barbearia — até X horas antes, até X
+  minutos depois de agendar, ou não cancela online; equipe cancela a qualquer momento (barbeiro só a própria agenda).
 conventions: [multi-tenancy, server-actions]
 
 entrypoints:
@@ -12,11 +14,12 @@ entrypoints:
 
 stages:
   - stage: cliente_cancela
-    description: Confere dono do agendamento e prazo minCancelHours
+    description: Confere dono (userId ou accessToken do link) e a regra cancellationPolicy
     file: src/app/actions/customer.ts
     symbol: cancelMyBookingAction
     calls:
       - { file: src/lib/booking/service.ts, symbol: cancelBooking }
+      - { file: src/lib/booking/policy.ts, symbol: canCustomerCancel }
     errors:
       CANCEL_TOO_LATE: fora do prazo da barbearia
       NOT_FOUND: agendamento de outra pessoa (não revela existência)
@@ -33,8 +36,11 @@ stages:
 
 invariants:
   - Só CONFIRMED pode ser cancelado
+  - Cliente nunca cancela depois do início, em nenhuma regra
+  - A regra é configurada em Personalização (settings.manage) e mostrada no agendamento e no e-mail
   - O horário volta a ficar livre (a constraint ignora CANCELLED)
 
 tests:
+  - tests/auth-and-policy.test.ts
   - tests/booking.db.test.ts
   - tests/calendar-and-marketplace.test.ts

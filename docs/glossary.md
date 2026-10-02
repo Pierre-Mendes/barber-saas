@@ -13,7 +13,8 @@ os dois (o RAG usa a mesma lista em `scripts/rag/lib.mjs` → `GLOSSARY`).
 | Vitrine | *marketplace*, `/explore` | Só para clientes logados |
 | Favorita | `Favorite` | Barbearias favoritas do usuário |
 | Usuário | `User` | Identidade global (e-mail) |
-| Cliente (da barbearia) | `Customer` | Registro do usuário **dentro** de uma barbearia |
+| Cliente (da barbearia) | `Customer` | Registro **dentro** de uma barbearia: por conta (`userId`) ou, sem conta, por `email` |
+| Visitante / sem conta | *guest* | Agenda com nome + e-mail; gerencia pelo link com `Booking.accessToken` |
 | Membro da equipe | `Membership` | Usuário com papel no painel |
 | Papel | `Role` | `OWNER`, `MANAGER`, `RECEPTIONIST`, `BARBER` |
 | Dono / Gerente / Recepção / Barbeiro | `OWNER` / `MANAGER` / `RECEPTIONIST` / `BARBER` | |
@@ -25,6 +26,8 @@ os dois (o RAG usa a mesma lista em `scripts/rag/lib.mjs` → `GLOSSARY`).
 | Horário livre | *slot* | Calculado por `computeAvailableSlots` |
 | Dia local | `YYYY-MM-DD` | Data no fuso da barbearia (`Tenant.timezone`) |
 | Lembrete | *reminder* | E-mail + push 24h antes |
+| Regra de cancelamento | `CancellationPolicy` | `HOURS_BEFORE_START`, `WINDOW_AFTER_BOOKING`, `NONE` |
+| Senha / acesso rápido | provider `password`, `DEMO_ACCOUNTS` | scrypt; atalhos do seed em dev |
 | Notificação no celular | Web Push, `PushSubscription` | Sem WhatsApp |
 | Painel | `/admin/[slug]` | Gestão da barbearia |
 | Personalização | *settings* | Nome, cor, logo, capa, link, regras |

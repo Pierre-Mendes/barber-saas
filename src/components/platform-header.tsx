@@ -3,10 +3,10 @@ import { ScissorsIcon } from "lucide-react"
 import { auth, signOut } from "@/auth"
 import { AppMenu, type MenuLink } from "@/components/app-menu"
 import { Card } from "@/components/ui/card"
+import { signInOptions } from "@/lib/auth/options"
+import { ROLE_LABELS } from "@/lib/auth/permissions"
 import { PLATFORM_NAME } from "@/lib/catalog"
 import { db } from "@/lib/db"
-
-const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)
 
 export function PlatformLogo() {
   return (
@@ -23,12 +23,25 @@ export function PlatformLogo() {
 export async function PlatformHeader() {
   const session = await auth()
   const user = session?.user ?? null
-  const hasPanel = user?.id ? (await db.membership.count({ where: { userId: user.id } })) > 0 : false
+  const memberships = user?.id
+    ? await db.membership.findMany({
+        where: { userId: user.id, tenant: { active: true } },
+        select: { role: true, tenant: { select: { slug: true, name: true } } },
+        orderBy: { tenant: { name: "asc" } },
+      })
+    : []
 
+  // Equipe vê um atalho para cada painel em que trabalha; os demais podem cadastrar a própria barbearia.
+  const panelLinks: MenuLink[] = memberships.map((m) => ({
+    href: `/admin/${m.tenant.slug}`,
+    label: `Painel · ${m.tenant.name} (${ROLE_LABELS[m.role]})`,
+    icon: "panel",
+  }))
   const links: MenuLink[] = [
     { href: "/", label: "Início", icon: "home" },
     { href: "/bookings", label: "Agendamentos", icon: "calendar" },
-    hasPanel ? { href: "/admin", label: "Painel da barbearia", icon: "panel" } : { href: "/onboarding", label: "Cadastrar minha barbearia", icon: "store" },
+    ...(user ? [{ href: "/conta", label: "Minha conta", icon: "account" } as const] : []),
+    ...(panelLinks.length > 0 ? panelLinks : [{ href: "/onboarding", label: "Cadastrar minha barbearia", icon: "store" } as const]),
   ]
 
   async function signOutAction() {
@@ -46,7 +59,7 @@ export async function PlatformHeader() {
           user={user}
           links={links}
           showCategories
-          googleEnabled={googleEnabled}
+          signInOptions={signInOptions()}
           signOutAction={signOutAction}
         />
       </div>

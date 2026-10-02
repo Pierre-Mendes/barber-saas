@@ -1,12 +1,21 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { MailIcon } from "lucide-react"
+import { KeyRoundIcon, LogInIcon, MailIcon, UserPlusIcon, ZapIcon } from "lucide-react"
 import { toast } from "sonner"
-import { signInWithEmailAction, signInWithGoogleAction } from "@/app/actions/auth"
+import {
+  demoSignInAction,
+  signInWithEmailAction,
+  signInWithGoogleAction,
+  signInWithPasswordAction,
+  signUpAction,
+  type AuthResult,
+} from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
 import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { Input, Label } from "@/components/ui/input"
+import type { SignInOptions } from "@/lib/auth/options"
+import { cn } from "@/lib/utils"
 
 function GoogleLogo() {
   return (
@@ -36,25 +45,53 @@ function Heading({ asPage, title, children }: { asPage?: boolean; title: string;
   )
 }
 
+function Divider({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+      <span className="h-px flex-1 bg-border" /> {children} <span className="h-px flex-1 bg-border" />
+    </div>
+  )
+}
+
+type Mode = "signin" | "signup" | "link" | "sent"
+
+const TITLES: Record<Exclude<Mode, "sent">, { title: string; text: string }> = {
+  signin: { title: "Entrar", text: "Use seu e-mail e senha." },
+  signup: { title: "Criar conta", text: "Leva 10 segundos. Depois é só agendar." },
+  link: { title: "Entrar sem senha", text: "Enviamos um link de acesso para o seu e-mail." },
+}
+
 /**
- * Login: link mágico por e-mail e Google (se configurado).
+ * Login: e-mail + senha (padrão), criar conta, link por e-mail (sem senha / esqueci a senha),
+ * Google (se configurado) e, em desenvolvimento, atalhos para as contas de demonstração.
  * `asPage` renderiza fora de um diálogo (página /login).
  */
 export function SignInDialogContent({
   callbackUrl,
-  googleEnabled,
+  options,
   asPage,
 }: {
   callbackUrl?: string
-  googleEnabled: boolean
+  options: SignInOptions
   asPage?: boolean
 }) {
+  const [mode, setMode] = useState<Mode>("signin")
+  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
-  const [sent, setSent] = useState(false)
+  const [password, setPassword] = useState("")
   const [pending, startTransition] = useTransition()
   const target = callbackUrl ?? (typeof window !== "undefined" ? window.location.pathname : "/")
 
-  if (sent) {
+  /** Recarrega a página inteira para todos os componentes de servidor verem a sessão nova. */
+  function finish(result: AuthResult) {
+    if (result.ok) {
+      window.location.assign(result.redirectTo)
+    } else {
+      toast.error(result.error)
+    }
+  }
+
+  if (mode === "sent") {
     return (
       <div className="flex flex-col items-center gap-3">
         <div className="flex size-14 items-center justify-center rounded-full bg-primary/15 text-primary">
@@ -63,53 +100,145 @@ export function SignInDialogContent({
         <Heading asPage={asPage} title="Confira seu e-mail">
           Enviamos um link de acesso para <b className="text-foreground">{email}</b>. Ele vale por 24 horas.
         </Heading>
+        <Button variant="ghost" size="sm" onClick={() => setMode("signin")}>
+          Voltar e entrar com senha
+        </Button>
       </div>
     )
   }
 
   return (
     <>
-      <Heading asPage={asPage} title="Faça login">
-        Entre para agendar e acompanhar seus horários.
+      <Heading asPage={asPage} title={TITLES[mode].title}>
+        {TITLES[mode].text}
       </Heading>
+
+      {mode !== "link" && (
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-secondary p-1" role="tablist">
+          {(["signin", "signup"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={mode === tab}
+              onClick={() => setMode(tab)}
+              className={cn(
+                "cursor-pointer rounded-md py-1.5 text-sm font-semibold text-muted-foreground transition",
+                mode === tab && "bg-background text-foreground shadow",
+              )}
+            >
+              {tab === "signin" ? "Entrar" : "Criar conta"}
+            </button>
+          ))}
+        </div>
+      )}
+
       <form
         className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault()
           startTransition(async () => {
-            const result = await signInWithEmailAction(email, target)
-            if (result.ok) {
-              setSent(true)
+            if (mode === "signin") {
+              finish(await signInWithPasswordAction(email, password, target))
+            } else if (mode === "signup") {
+              finish(await signUpAction({ name, email, password }, target))
             } else {
-              toast.error(result.error)
+              const result = await signInWithEmailAction(email, target)
+              if (result.ok) {
+                setMode("sent")
+              } else {
+                toast.error(result.error)
+              }
             }
           })
         }}
       >
-        <Input
-          id="email"
-          type="email"
-          required
-          placeholder="seu@email.com"
-          autoComplete="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
+        {mode === "signup" && (
+          <div>
+            <Label htmlFor="signin-name">Nome</Label>
+            <Input id="signin-name" required autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} />
+          </div>
+        )}
+        <div>
+          <Label htmlFor="signin-email">E-mail</Label>
+          <Input
+            id="signin-email"
+            type="email"
+            required
+            placeholder="seu@email.com"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
+        {mode !== "link" && (
+          <div>
+            <Label htmlFor="signin-password">Senha</Label>
+            <Input
+              id="signin-password"
+              type="password"
+              required
+              minLength={mode === "signup" ? 8 : undefined}
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              placeholder={mode === "signup" ? "Mínimo de 8 caracteres" : undefined}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
+        )}
         <Button type="submit" className="w-full" disabled={pending}>
-          <MailIcon />
-          {pending ? "Enviando…" : "Receber link de acesso"}
+          {mode === "signin" && <LogInIcon />}
+          {mode === "signup" && <UserPlusIcon />}
+          {mode === "link" && <MailIcon />}
+          {pending ? "Aguarde…" : mode === "signin" ? "Entrar" : mode === "signup" ? "Criar conta e entrar" : "Receber link de acesso"}
         </Button>
       </form>
-      {googleEnabled && (
+
+      <div className="flex justify-center">
+        {mode === "link" ? (
+          <Button variant="link" size="sm" onClick={() => setMode("signin")}>
+            <KeyRoundIcon /> Entrar com senha
+          </Button>
+        ) : (
+          <Button variant="link" size="sm" onClick={() => setMode("link")}>
+            <MailIcon /> Esqueci a senha / entrar sem senha
+          </Button>
+        )}
+      </div>
+
+      {options.googleEnabled && (
         <>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="h-px flex-1 bg-border" /> ou <span className="h-px flex-1 bg-border" />
-          </div>
+          <Divider>ou</Divider>
           <form action={signInWithGoogleAction.bind(null, target)}>
             <Button type="submit" variant="outline" className="w-full font-bold">
               <GoogleLogo /> Google
             </Button>
           </form>
+        </>
+      )}
+
+      {options.demoAccounts.length > 0 && (
+        <>
+          <Divider>
+            <span className="flex items-center gap-1">
+              <ZapIcon className="size-3" /> acesso rápido (demonstração)
+            </span>
+          </Divider>
+          <div className="grid grid-cols-2 gap-2">
+            {options.demoAccounts.map((account) => (
+              <Button
+                key={account.email}
+                type="button"
+                variant="secondary"
+                className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left whitespace-normal"
+                disabled={pending}
+                onClick={() => startTransition(async () => finish(await demoSignInAction(account.email, target)))}
+              >
+                <span className="text-sm font-bold">{account.label}</span>
+                <span className="text-[11px] leading-tight font-normal text-muted-foreground">{account.description}</span>
+              </Button>
+            ))}
+          </div>
         </>
       )}
     </>

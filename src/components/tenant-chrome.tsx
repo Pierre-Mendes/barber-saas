@@ -4,8 +4,7 @@ import { auth, signOut } from "@/auth"
 import { AppMenu, type MenuLink } from "@/components/app-menu"
 import { UserAvatar } from "@/components/user-avatar"
 import { Card } from "@/components/ui/card"
-
-const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)
+import { signInOptions } from "@/lib/auth/options"
 
 /** Menu da página white-label: só links da própria barbearia, nada da plataforma. */
 export async function TenantMenu({ basePath, triggerClassName }: { basePath: string; triggerClassName?: string }) {
@@ -22,7 +21,7 @@ export async function TenantMenu({ basePath, triggerClassName }: { basePath: str
     <AppMenu
       user={session?.user ?? null}
       links={links}
-      googleEnabled={googleEnabled}
+      signInOptions={signInOptions()}
       signOutAction={signOutAction}
       triggerClassName={triggerClassName}
     />

@@ -1,5 +1,7 @@
 name: Agendamento pelo cliente
-description: Cliente escolhe serviço, profissional, dia e horário na página white-label e confirma.
+description: >-
+  Cliente escolhe serviço, profissional, dia e horário na página white-label e confirma — logado ou sem conta
+  (nome + e-mail; recebe link com segredo para ver/cancelar).
 conventions: [multi-tenancy, server-actions, database, ui]
 
 entrypoints:
@@ -25,12 +27,13 @@ stages:
       - { file: src/lib/scheduling/availability.ts, symbol: computeAvailableSlots }
 
   - stage: confirmar
-    description: Autentica, valida (zod), revalida o horário e grava
+    description: Usuário logado ou visitante (guest), valida (zod), rate limit, revalida o horário e grava com accessToken
     file: src/app/actions/customer.ts
     symbol: createBookingAction
     calls:
       - { file: src/lib/booking/service.ts, symbol: createBooking }
       - { file: src/lib/booking/service.ts, symbol: findOrCreateCustomer }
+      - { file: src/lib/booking/service.ts, symbol: newAccessToken }
     errors:
       SLOT_UNAVAILABLE: horário saiu da disponibilidade
       SLOT_TAKEN: constraint booking_no_overlap (23P01) — outra pessoa reservou antes
@@ -41,14 +44,15 @@ stages:
     symbol: notifyBookingConfirmed
 
   - stage: confirmacao
-    description: Página com resumo, salvar na agenda, lembretes e cancelamento
+    description: Página com resumo, salvar na agenda, lembretes e cancelamento (login ou ?token= do e-mail)
     file: src/app/t/[tenant]/reserva/[id]/page.tsx
     symbol: BookingDetailPage
 
 invariants:
   - Barbeiro e serviço precisam ser da mesma barbearia (tenantId) e ativos
   - Nenhum horário sobreposto por barbeiro (constraint no banco)
-  - Um Customer por (tenant, user), mesmo com reservas simultâneas
+  - Um Customer por (tenant, user) e por (tenant, email), mesmo com reservas simultâneas
+  - Visitante vira cliente da conta só com e-mail confirmado (linkGuestCustomers no login)
 
 tests:
   - tests/booking.db.test.ts

@@ -23,10 +23,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=app:app /app/.next/standalone ./
 COPY --from=builder --chown=app:app /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# O CLI do Prisma (para `migrate deploy` na subida) tem dependências próprias (effect, c12…) que
+# o build standalone não inclui: instala o CLI na mesma versão do projeto, fora do node_modules do app.
+COPY --from=builder /app/node_modules/prisma/package.json /tmp/prisma-package.json
+RUN npm install -g "prisma@$(node -p "require('/tmp/prisma-package.json').version")" && npm cache clean --force && rm /tmp/prisma-package.json
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+CMD ["sh", "-c", "prisma migrate deploy && node server.js"]

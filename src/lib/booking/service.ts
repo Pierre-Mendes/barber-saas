@@ -1,9 +1,11 @@
+import { randomBytes } from "node:crypto"
 import { Prisma, type Booking, type BookingStatus } from "@prisma/client"
 import { cached, getVersion } from "@/lib/cache"
 import { cacheKeys, invalidateSchedule, TTL, VERSION } from "@/lib/cache/keys"
 import { db } from "@/lib/db"
 import { computeAvailableSlots } from "@/lib/scheduling/availability"
 import { addDays, localDayBounds, toLocalDate } from "@/lib/scheduling/time"
+import { canCustomerCancel, describeCancellationPolicy } from "./policy"
 
 export class BookingError extends Error {
   constructor(
@@ -106,37 +108,75 @@ async function computeSlots(query: AvailabilityQuery): Promise<Date[]> {
   })
 }
 
+/** Quem está agendando: usuário logado ou visitante sem conta (identificado pelo e-mail). */
+export type BookingCustomer =
+  | { kind: "user"; userId: string; email: string; name: string; phone?: string | null }
+  | { kind: "guest"; email: string; name: string; phone?: string | null }
+
 interface CreateBookingInput {
   tenantId: string
-  userId: string
+  customer: BookingCustomer
   barberId: string
   serviceId: string
   startsAt: Date
-  customerName: string
-  customerPhone?: string | null
   notes?: string
   now?: Date
 }
 
 /**
- * Registro do cliente na barbearia. Duas reservas simultâneas do mesmo cliente
- * novo podem disputar a criação; quem perde relê o registro criado pelo outro.
+ * Registro do cliente na barbearia (por conta ou, sem conta, por e-mail). Duas reservas
+ * simultâneas do mesmo cliente novo podem disputar a criação: quem perde (P2002) tenta de novo
+ * e encontra o registro criado pelo outro.
  */
-async function findOrCreateCustomer(tenantId: string, userId: string, name: string, phone: string | null) {
-  const key = { tenantId_userId: { tenantId, userId } }
-  try {
-    return await db.customer.upsert({
-      where: key,
-      create: { tenantId, userId, name, phone },
-      update: phone ? { phone } : {},
-    })
-  } catch (error) {
-    if (!isPrismaUniqueViolation(error)) {
-      throw error
+async function findOrCreateCustomer(tenantId: string, input: BookingCustomer) {
+  const email = input.email.trim().toLowerCase()
+  const phone = input.phone || null
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await upsertCustomer(tenantId, input, email, phone)
+    } catch (error) {
+      if (!isPrismaUniqueViolation(error) || attempt > 0) {
+        throw error
+      }
     }
-    const existing = await db.customer.findUniqueOrThrow({ where: key })
+  }
+}
+
+async function upsertCustomer(tenantId: string, input: BookingCustomer, email: string, phone: string | null) {
+  if (input.kind === "user") {
+    const own = await db.customer.findUnique({ where: { tenantId_userId: { tenantId, userId: input.userId } } })
+    if (own) {
+      return own.email && !phone ? own : db.customer.update({ where: { id: own.id }, data: { email: own.email ?? email, ...(phone ? { phone } : {}) } })
+    }
+    // Já tinha agendado sem conta com este e-mail: o registro passa a ser da conta.
+    const guest = await db.customer.findUnique({ where: { tenantId_email: { tenantId, email } } })
+    if (guest && !guest.userId) {
+      return db.customer.update({ where: { id: guest.id }, data: { userId: input.userId, ...(phone ? { phone } : {}) } })
+    }
+    return db.customer.create({ data: { tenantId, userId: input.userId, email, name: input.name, phone } })
+  }
+  const existing = await db.customer.findUnique({ where: { tenantId_email: { tenantId, email } } })
+  if (existing) {
     return phone ? db.customer.update({ where: { id: existing.id }, data: { phone } }) : existing
   }
+  return db.customer.create({ data: { tenantId, email, name: input.name, phone } })
+}
+
+/**
+ * Liga à conta os registros de cliente criados sem conta com o mesmo e-mail (todas as barbearias).
+ * Chamado no login, só quando o e-mail é comprovado.
+ */
+export async function linkGuestCustomers(userId: string, email: string): Promise<number> {
+  const result = await db.customer.updateMany({
+    where: { email: email.trim().toLowerCase(), userId: null },
+    data: { userId },
+  })
+  return result.count
+}
+
+/** Segredo do link "ver ou cancelar" do e-mail (192 bits). */
+export function newAccessToken(): string {
+  return randomBytes(24).toString("base64url")
 }
 
 function isOverlapViolation(error: unknown): boolean {
@@ -170,7 +210,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
     throw new BookingError("Esse horário não está mais disponível.", "SLOT_UNAVAILABLE")
   }
 
-  const customer = await findOrCreateCustomer(tenant.id, input.userId, input.customerName, input.customerPhone ?? null)
+  const customer = await findOrCreateCustomer(tenant.id, input.customer)
 
   try {
     const booking = await db.booking.create({
@@ -183,6 +223,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
         endsAt: new Date(input.startsAt.getTime() + service.durationMinutes * 60_000),
         price: service.price,
         notes: input.notes ?? "",
+        accessToken: newAccessToken(),
       },
     })
     await invalidateSchedule(tenant.id)
@@ -197,11 +238,15 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   }
 }
 
-type CancelActor = { kind: "customer"; userId: string } | { kind: "staff"; tenantId: string; barberId?: string }
+type CancelActor =
+  | { kind: "customer"; userId: string }
+  /** Visitante sem conta, com o segredo do link enviado por e-mail. */
+  | { kind: "token"; token: string }
+  | { kind: "staff"; tenantId: string; barberId?: string }
 
 /**
- * Cancela um agendamento. Cliente respeita a antecedência mínima da barbearia;
- * equipe pode cancelar a qualquer momento (barbeiro só os próprios).
+ * Cancela um agendamento. Cliente (com conta ou pelo link) respeita a política de cancelamento
+ * da barbearia; equipe pode cancelar a qualquer momento (barbeiro só os próprios).
  */
 export async function cancelBooking(bookingId: string, actor: CancelActor, now: Date = new Date()): Promise<Booking> {
   const booking = await db.booking.findUnique({
@@ -212,14 +257,17 @@ export async function cancelBooking(bookingId: string, actor: CancelActor, now: 
     throw new BookingError("Agendamento não encontrado.", "NOT_FOUND")
   }
 
-  if (actor.kind === "customer") {
-    if (booking.customer.userId !== actor.userId) {
+  if (actor.kind === "customer" || actor.kind === "token") {
+    const owns =
+      actor.kind === "customer"
+        ? booking.customer.userId === actor.userId
+        : Boolean(booking.accessToken) && booking.accessToken === actor.token
+    if (!owns) {
       throw new BookingError("Agendamento não encontrado.", "NOT_FOUND")
     }
-    const limit = booking.startsAt.getTime() - booking.tenant.minCancelHours * 3_600_000
-    if (now.getTime() > limit) {
+    if (booking.status === "CONFIRMED" && !canCustomerCancel(booking.tenant, booking, now)) {
       throw new BookingError(
-        `Cancelamentos precisam ser feitos com ${booking.tenant.minCancelHours}h de antecedência. Fale com a barbearia.`,
+        `${describeCancellationPolicy(booking.tenant)} Esse prazo já passou: fale com a barbearia.`,
         "CANCEL_TOO_LATE",
       )
     }

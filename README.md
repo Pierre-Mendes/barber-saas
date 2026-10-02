@@ -50,11 +50,14 @@ O cliente agenda em segundos, recebe lembrete por e-mail e no celular e salva o 
 - **Busca** por nome, bairro ou serviço, com atalhos por categoria (Cabelo, Barba, Acabamento, Massagem,
   Sobrancelha, Hidratação).
 - **Reserva em poucos toques:** serviço → profissional → dia → horário livre → confirmar.
+- **Agendar sem conta:** só nome e e-mail. O e-mail traz um link seguro para ver ou cancelar; ao criar conta
+  com o mesmo e-mail (confirmado), as reservas aparecem nela.
 - **Lembretes** por e-mail (confirmação e 24h antes) e **notificação no celular** (Web Push, sem WhatsApp).
 - **Salvar na agenda:** Google Agenda, Outlook e Apple Calendar (`.ics`).
-- **Meus agendamentos:** confirmados e finalizados, com detalhes, mapa, telefones e cancelamento dentro do
-  prazo definido pela barbearia.
-- Login sem senha: **link por e-mail** (ou Google, se configurado).
+- **Meus agendamentos:** confirmados e finalizados, com detalhes, mapa, telefones e cancelamento dentro da
+  regra definida pela barbearia.
+- **Login com e-mail e senha** (ou link por e-mail, para quem esqueceu a senha, e Google, se configurado).
+- **Minha conta:** nome, celular, foto (upload) e senha.
 
 ### Para a barbearia
 - **Link próprio para divulgar:** `sua-barbearia.seuapp.com.br`, domínio próprio (`agenda.suabarbearia.com.br`)
@@ -64,12 +67,15 @@ O cliente agenda em segundos, recebe lembrete por e-mail e no celular e salva o 
 - **Barbeiros com agenda individual:** expediente semanal com pausa para almoço, folgas/bloqueios e serviços
   que cada um realiza.
 - **Serviços** com preço, duração e imagem.
-- **Upload de imagens** (logo, capa, fotos dos barbeiros e dos serviços) direto do painel, com pré-visualização.
+- **Upload de imagens** em todos os níveis: logo, capa e serviços (dono/gerente), foto do próprio perfil
+  (barbeiro) e foto da conta (qualquer usuário). Nada de colar URL.
 - **Agenda do dia** com indicadores, filtro por barbeiro e ações (concluído, faltou, cancelar).
 - **Agendamento pelo balcão/telefone:** a recepção agenda pelo cliente, que recebe a confirmação por e-mail.
-- **Equipe e níveis de acesso:** dono, gerente, recepção e barbeiro.
-- **Regras da agenda:** intervalo entre horários, antecedência mínima, prazo de cancelamento e janela de
-  agendamento.
+- **Equipe e níveis de acesso:** dono, gerente, recepção e barbeiro. Quem é da equipe cai direto no painel
+  ao entrar; o barbeiro vê "Minha agenda" e "Meu perfil e horários".
+- **Regras da agenda:** intervalo entre horários, antecedência mínima e janela de agendamento.
+- **Regra de cancelamento pelo cliente:** até X horas antes do horário, **até X minutos depois de agendar**
+  (ex.: 1 hora) ou só falando com a barbearia. A equipe sempre pode cancelar.
 
 ### Garantias técnicas
 - **Isolamento entre barbearias:** todo acesso ao painel passa por uma checagem de vínculo com a barbearia.
@@ -79,7 +85,8 @@ O cliente agenda em segundos, recebe lembrete por e-mail e no celular e salva o 
 - **Fuso horário correto** por barbearia, sem dependências externas.
 - **Cache no Redis** para a barbearia (resolvida em toda página white-label), horários livres e vitrine, com
   invalidação imediata ao mudar a agenda ou a personalização. Se o Redis cair, tudo segue funcionando pelo banco.
-- **Rate limit** no login por link mágico (por e-mail, por IP e no próprio provedor) e nas reservas.
+- **Rate limit** no login (senha e link, por e-mail e por IP), no cadastro e nas reservas (com e sem conta).
+- **Senhas com scrypt** (`node:crypto`), comparação em tempo constante.
 - **Imagens em storage S3 (MinIO)**, validadas pelo conteúdo real (JPG, PNG, WebP, AVIF; SVG recusado), até 5 MB,
   isoladas por barbearia.
 
@@ -225,7 +232,9 @@ npm run dev
 
 O seed cria 8 barbearias fictícias em **Uberaba-MG** (Zebu Barber Club, Vintage Barber, Barba Negra, The Dapper Den…).
 
-O login é por link mágico: digite o e-mail e abra o link no **Mailpit** (http://localhost:8025).
+Todas as contas usam a senha **`barber123`**. Em desenvolvimento, a tela de login mostra botões de
+**acesso rápido** (Dono, Recepção, Barbeiro, Cliente): um clique e você está dentro, já na visão certa.
+Para desligar, `DEMO_LOGINS=false`; em produção eles só aparecem com `DEMO_LOGINS=true`.
 
 | E-mail | Perfil |
 |---|---|
@@ -252,6 +261,7 @@ Páginas públicas: http://localhost:3000/t/zebu ou http://zebu.localhost:3000 (
 | `CRON_SECRET` | ✅ | Protege o endpoint de lembretes |
 | `NEXT_PUBLIC_PLATFORM_NAME` | | Nome da plataforma (padrão: *Agenda Barber*) |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | | Habilita o login com Google |
+| `DEMO_LOGINS` | | Atalhos de login das contas de demonstração (padrão: ligado em dev, desligado em produção) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | | Habilitam o Web Push |
 | `VAPID_SUBJECT` | | Contato do remetente do push (`mailto:…`) |
 | `REDIS_URL` | recomendada | Cache e rate limit. Sem ela, cache em memória do processo (só dev) |

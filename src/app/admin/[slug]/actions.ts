@@ -123,21 +123,15 @@ export async function staffCreateBooking(slug: string, formData: FormData) {
   if (!canManageBarberSchedule(ctx, input.barberId) && !can(ctx.membership.role, "bookings.manageAll")) {
     back(returnTo, "erro", "Você só pode agendar na sua agenda.")
   }
-  const user = await db.user.upsert({
-    where: { email: input.email },
-    create: { email: input.email, name: input.name, phone: input.phone || null },
-    update: {},
-  })
   let bookingId: string
   try {
+    // Cliente do balcão não precisa de conta: fica registrado pelo e-mail nesta barbearia.
     const booking = await createBooking({
       tenantId: ctx.tenant.id,
-      userId: user.id,
+      customer: { kind: "guest", email: input.email, name: input.name, phone: input.phone || null },
       barberId: input.barberId,
       serviceId: input.serviceId,
       startsAt: zonedToUtc(input.date, hhmmToMinutes(input.time), ctx.tenant.timezone),
-      customerName: input.name,
-      customerPhone: input.phone || null,
     })
     bookingId = booking.id
   } catch (error) {
@@ -287,6 +281,31 @@ export async function updateBarberProfile(slug: string, barberId: string, formDa
   }
   await invalidateSchedule(ctx.tenant.id)
   back(path, "ok", "Barbeiro atualizado.")
+}
+
+/** O próprio barbeiro edita nome, bio e foto (sem mexer em serviços, acesso ou status). */
+export async function updateOwnBarberProfile(slug: string, barberId: string, formData: FormData) {
+  const ctx = await requirePanel(slug, "schedule.manageOwn")
+  const path = `/admin/${slug}/barbers/${barberId}`
+  if (ctx.ownBarber?.id !== barberId) {
+    back(path, "erro", "Você só pode editar o seu perfil.")
+  }
+  const current = ctx.ownBarber
+  const typedPhotoUrl = text(formData, "photoUrl")
+  if (!imageRef.safeParse(typedPhotoUrl).success) {
+    back(path, "erro", "URL da foto inválida.")
+  }
+  const photoUrl = await uploadedOr(ctx, formData, "photoFile", "barber", typedPhotoUrl || null, path)
+  const name = text(formData, "name")
+  await db.barber.update({
+    where: { id: current.id },
+    data: { name: name.length >= 2 ? name.slice(0, 80) : undefined, bio: text(formData, "bio").slice(0, 500), photoUrl },
+  })
+  if (current.photoUrl !== photoUrl) {
+    await removeTenantImage(ctx.tenant.id, current.photoUrl)
+  }
+  await invalidateSchedule(ctx.tenant.id)
+  back(path, "ok", "Perfil atualizado.")
 }
 
 /** Recebe, por dia da semana, até dois blocos (manhã/tarde) no formato HH:MM. */
@@ -467,6 +486,8 @@ const settingsSchema = z.object({
   slotIntervalMinutes: z.coerce.number().int().min(5).max(120),
   minBookingLeadMin: z.coerce.number().int().min(0).max(10080),
   minCancelHours: z.coerce.number().int().min(0).max(168),
+  cancellationPolicy: z.enum(["NONE", "HOURS_BEFORE_START", "WINDOW_AFTER_BOOKING"]),
+  cancelWindowMinutes: z.coerce.number().int().min(0).max(10080),
   bookingWindowDays: z.coerce.number().int().min(1).max(180),
 })
 

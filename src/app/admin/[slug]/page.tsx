@@ -174,7 +174,7 @@ export default async function AgendaPage({
                   {booking.service.name} · {booking.barber.name} · {formatCurrency(booking.price)}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {booking.customer.phone ?? "sem telefone"} · {booking.customer.user.email}
+                  {booking.customer.phone ?? "sem telefone"} · {booking.customer.email ?? booking.customer.user?.email}
                 </p>
               </div>
             </div>

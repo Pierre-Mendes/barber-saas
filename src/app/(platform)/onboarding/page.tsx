@@ -17,13 +17,15 @@ const onboardingSchema = z.object({
   slug: z.string().trim().toLowerCase().refine(isValidSlug, "Link inválido ou reservado."),
   address: z.string().trim().max(200).default(""),
   iAmBarber: z.boolean(),
-})
+  /** Nome do dono como barbeiro (aparece para os clientes). Obrigatório se `iAmBarber`. */
+  barberName: z.string().trim().max(80),
+}).refine((data) => !data.iAmBarber || data.barberName.length >= 2, "Informe o seu nome como barbeiro.")
 
 /** Seg–sáb, 09:00–19:00 — ponto de partida editável no painel. */
 const DEFAULT_WORKING_HOURS = [1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, startMinute: 540, endMinute: 1140 }))
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  await requireUser("/onboarding")
+  const sessionUser = await requireUser("/onboarding")
   const { error } = await searchParams
 
   async function createTenant(formData: FormData) {
@@ -34,12 +36,16 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
       slug: formData.get("slug"),
       address: formData.get("address") ?? "",
       iAmBarber: formData.get("iAmBarber") === "on",
+      barberName: formData.get("barberName") ?? "",
     })
     if (!parsed.success) {
       redirect(`/onboarding?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Dados inválidos.")}`)
     }
-    const { name, slug, address, iAmBarber } = parsed.data
+    const { name, slug, address, iAmBarber, barberName } = parsed.data
     try {
+      if (iAmBarber && !user.name) {
+        await db.user.update({ where: { id: user.id }, data: { name: barberName } })
+      }
       const tenant = await db.tenant.create({
         data: {
           name,
@@ -47,7 +53,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
           address,
           memberships: { create: { userId: user.id, role: "OWNER" } },
           barbers: iAmBarber
-            ? { create: { name: user.name || name, userId: user.id, workingHours: { create: DEFAULT_WORKING_HOURS } } }
+            ? { create: { name: barberName, userId: user.id, workingHours: { create: DEFAULT_WORKING_HOURS } } }
             : undefined,
         },
       })
@@ -84,9 +90,15 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
             <Field label="Endereço" htmlFor="address">
               <Input id="address" name="address" />
             </Field>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="iAmBarber" defaultChecked className="size-4 accent-[var(--brand)]" /> Eu também atendo como barbeiro
-            </label>
+            <fieldset className="grid gap-3 rounded-lg border p-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="iAmBarber" defaultChecked className="size-4 accent-[var(--brand)]" /> Eu também
+                atendo como barbeiro
+              </label>
+              <Field label="Seu nome como barbeiro" htmlFor="barberName" hint="É o nome que o cliente vê ao escolher o profissional.">
+                <Input id="barberName" name="barberName" defaultValue={sessionUser.name ?? ""} placeholder="Ex.: Zé Ricardo" />
+              </Field>
+            </fieldset>
             <SubmitButton size="lg" pendingText="Criando…">
               Criar barbearia
             </SubmitButton>

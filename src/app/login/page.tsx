@@ -1,7 +1,6 @@
 import { SignInDialogContent } from "@/components/sign-in-dialog"
 import { Card, CardContent } from "@/components/ui/card"
-
-const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)
+import { signInOptions } from "@/lib/auth/options"
 
 /** Tela de login neutra (sem marca da plataforma): também é usada a partir dos links das barbearias. */
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ callbackUrl?: string; error?: string }> }) {
@@ -17,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               O link expirou ou já foi usado. Peça um novo.
             </p>
           )}
-          <SignInDialogContent asPage googleEnabled={googleEnabled} callbackUrl={safeCallback} />
+          <SignInDialogContent asPage options={signInOptions()} callbackUrl={safeCallback} />
         </CardContent>
       </Card>
     </main>

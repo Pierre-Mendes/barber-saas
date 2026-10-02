@@ -9,6 +9,8 @@ export interface BookingMessageContext {
   barberName: string
   serviceName: string
   price: string
+  /** Política de cancelamento da barbearia, em uma frase. */
+  cancellationText?: string
   address: string
   startsAt: Date
   manageUrl: string
@@ -57,6 +59,7 @@ function layout(ctx: BookingMessageContext, heading: string, intro: string, with
     </table>
     ${calendarButtons}
     <p style="margin-top:24px"><a href="${escapeHtml(ctx.manageUrl)}">Ver ou cancelar agendamento</a></p>
+    ${ctx.cancellationText ? `<p style="color:#666;font-size:13px">${escapeHtml(ctx.cancellationText)}</p>` : ""}
   </div></body></html>`
 }
 
@@ -71,6 +74,7 @@ function plainText(ctx: BookingMessageContext, heading: string): string {
     `Endereço: ${ctx.address}`,
     "",
     `Gerenciar: ${ctx.manageUrl}`,
+    ...(ctx.cancellationText ? [ctx.cancellationText] : []),
   ].join("\n")
 }
 
@@ -96,8 +100,8 @@ export function bookingCancelledEmail(ctx: BookingMessageContext): EmailContent 
   const heading = "Agendamento cancelado"
   return {
     subject: `Agendamento cancelado — ${ctx.tenantName}`,
-    html: layout(ctx, heading, `Olá, ${ctx.customerName}. O agendamento abaixo foi cancelado.`, false),
-    text: plainText(ctx, heading),
+    html: layout({ ...ctx, cancellationText: undefined }, heading, `Olá, ${ctx.customerName}. O agendamento abaixo foi cancelado.`, false),
+    text: plainText({ ...ctx, cancellationText: undefined }, heading),
   }
 }
 

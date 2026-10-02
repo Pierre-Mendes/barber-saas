@@ -2,9 +2,10 @@ import { PageHeader } from "@/components/admin/page-header"
 import { Flash, type FlashParams } from "@/components/flash"
 import { SubmitButton } from "@/components/submit-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Field, Input, Textarea } from "@/components/ui/input"
+import { Field, Input, NativeSelect, Textarea } from "@/components/ui/input"
 import { ImageField } from "@/components/admin/image-field"
 import { requirePanel } from "@/lib/auth/guards"
+import { describeCancellationPolicy } from "@/lib/booking/policy"
 import { isStorageConfigured } from "@/lib/storage"
 import { tenantFallbackCover } from "@/lib/catalog"
 import { tenantPublicUrlFor } from "@/lib/tenancy/urls"
@@ -83,11 +84,33 @@ export default async function SettingsPage({ params, searchParams }: { params: P
             <Field label="Antecedência mínima (min)">
               <Input name="minBookingLeadMin" type="number" defaultValue={tenant.minBookingLeadMin} />
             </Field>
-            <Field label="Cancelamento até (horas antes)">
-              <Input name="minCancelHours" type="number" defaultValue={tenant.minCancelHours} />
-            </Field>
             <Field label="Agenda aberta por (dias)">
               <Input name="bookingWindowDays" type="number" defaultValue={tenant.bookingWindowDays} />
+            </Field>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Cancelamento pelo cliente</CardTitle>
+            <CardDescription>
+              Como o cliente pode cancelar pela internet. A equipe sempre pode cancelar pelo painel. Hoje:{" "}
+              <span className="text-foreground">{describeCancellationPolicy(tenant)}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-3">
+            <Field label="Regra" htmlFor="cancellationPolicy">
+              <NativeSelect id="cancellationPolicy" name="cancellationPolicy" defaultValue={tenant.cancellationPolicy}>
+                <option value="HOURS_BEFORE_START">Até X horas antes do horário</option>
+                <option value="WINDOW_AFTER_BOOKING">Até X minutos depois de agendar</option>
+                <option value="NONE">Não pode cancelar online</option>
+              </NativeSelect>
+            </Field>
+            <Field label="Horas antes do horário" hint="Usado na regra “antes do horário”.">
+              <Input name="minCancelHours" type="number" min={0} max={168} defaultValue={tenant.minCancelHours} />
+            </Field>
+            <Field label="Minutos depois de agendar" hint="Usado na regra “depois de agendar”. Ex.: 60 = 1 hora.">
+              <Input name="cancelWindowMinutes" type="number" min={0} max={10080} defaultValue={tenant.cancelWindowMinutes} />
             </Field>
           </CardContent>
         </Card>

@@ -7,8 +7,7 @@ Retornam um resultado tipado; o componente mostra o toast.
 
 ```ts
 export async function createBookingAction(input: Input): Promise<CreateBookingResult> {
-  const user = await currentUser()                  // 1. autenticação
-  if (!user) return { ok: false, error: "Entre para confirmar o agendamento.", needsLogin: true }
+  const user = await currentUser()                  // 1. autenticação (reserva aceita visitante com nome + e-mail)
   const parsed = schema.safeParse(input)            // 2. validação zod (nunca confiar no cliente)
   if (!parsed.success) return { ok: false, error: "Dados inválidos." }
   try {

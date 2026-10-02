@@ -2,8 +2,9 @@
 
 import { after } from "next/server"
 import { revalidatePath } from "next/cache"
+import { headers } from "next/headers"
 import { z } from "zod"
-import { currentUser } from "@/auth"
+import { clientIp, currentUser } from "@/auth"
 import { bumpVersion } from "@/lib/cache"
 import { VERSION } from "@/lib/cache/keys"
 import { RATE_LIMITS, rateLimit } from "@/lib/cache/rate-limit"
@@ -52,33 +53,52 @@ const createSchema = z.object({
   startsAt: z.iso.datetime(),
   phone: z.string().trim().max(30).optional(),
   notes: z.string().trim().max(500).optional(),
+  /** Só para quem agenda sem conta. */
+  guest: z
+    .object({
+      name: z.string().trim().min(2, "Informe seu nome.").max(80),
+      email: z.email("Informe um e-mail válido.").transform((email) => email.toLowerCase()),
+    })
+    .optional(),
 })
 
-export type CreateBookingResult = { ok: true; bookingId: string } | { ok: false; error: string; needsLogin?: boolean }
+export type CreateBookingInput = z.input<typeof createSchema>
 
-export async function createBookingAction(input: z.infer<typeof createSchema>): Promise<CreateBookingResult> {
+export type CreateBookingResult =
+  | { ok: true; bookingId: string; manageToken?: string }
+  | { ok: false; error: string; needsGuestInfo?: boolean }
+
+/** Reserva com conta ou sem conta (nome + e-mail). Quem agenda sem conta recebe o link de gestão por e-mail. */
+export async function createBookingAction(input: CreateBookingInput): Promise<CreateBookingResult> {
   const user = await currentUser()
-  if (!user) {
-    return { ok: false, error: "Entre para confirmar o agendamento.", needsLogin: true }
-  }
   const parsed = createSchema.safeParse(input)
   if (!parsed.success) {
-    return { ok: false, error: "Dados inválidos." }
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
-  if (!(await rateLimit("booking", user.id, RATE_LIMITS.booking)).ok) {
+  const { guest, phone, ...data } = parsed.data
+  if (!user && !guest) {
+    return { ok: false, error: "Informe seu nome e e-mail para confirmar.", needsGuestInfo: true }
+  }
+
+  const limits = [rateLimit("booking", user?.id ?? guest!.email, RATE_LIMITS.booking)]
+  if (!user) {
+    limits.push(rateLimit("booking:guest-ip", clientIp(await headers()), RATE_LIMITS.guestBookingIp))
+  }
+  if ((await Promise.all(limits)).some((limit) => !limit.ok)) {
     return { ok: false, error: "Muitas tentativas de reserva. Aguarde alguns minutos." }
   }
+
   try {
     const booking = await createBooking({
-      ...parsed.data,
-      startsAt: new Date(parsed.data.startsAt),
-      userId: user.id,
-      customerName: user.name || user.email?.split("@")[0] || "Cliente",
-      customerPhone: parsed.data.phone || null,
+      ...data,
+      startsAt: new Date(data.startsAt),
+      customer: user
+        ? { kind: "user", userId: user.id, email: user.email ?? "", name: user.name || user.email?.split("@")[0] || "Cliente", phone }
+        : { kind: "guest", email: guest!.email, name: guest!.name, phone },
     })
     after(() => notifyBookingConfirmed(booking.id))
     revalidatePath("/bookings")
-    return { ok: true, bookingId: booking.id }
+    return { ok: true, bookingId: booking.id, manageToken: user ? undefined : (booking.accessToken ?? undefined) }
   } catch (error) {
     if (error instanceof BookingError) {
       return { ok: false, error: error.message }
@@ -87,13 +107,14 @@ export async function createBookingAction(input: z.infer<typeof createSchema>): 
   }
 }
 
-export async function cancelMyBookingAction(bookingId: string): Promise<{ ok: boolean; error?: string }> {
-  const user = await currentUser()
-  if (!user) {
+/** Cancela pelo login ou, sem conta, pelo segredo do link enviado por e-mail. */
+export async function cancelMyBookingAction(bookingId: string, token?: string): Promise<{ ok: boolean; error?: string }> {
+  const user = token ? null : await currentUser()
+  if (!token && !user) {
     return { ok: false, error: "Não autenticado." }
   }
   try {
-    const booking = await cancelBooking(bookingId, { kind: "customer", userId: user.id })
+    const booking = await cancelBooking(bookingId, token ? { kind: "token", token } : { kind: "customer", userId: user!.id })
     after(() => notifyBookingCancelled(booking.id))
     revalidatePath("/bookings")
     return { ok: true }

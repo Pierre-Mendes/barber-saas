@@ -4,14 +4,15 @@ import { LogInIcon } from "lucide-react"
 import { SignInDialogContent } from "@/components/sign-in-dialog"
 import { Button, type ButtonProps } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import type { SignInOptions } from "@/lib/auth/options"
 
 /** Botão que abre o diálogo de login (e-mail / Google). */
 export function SignInButton({
   children = "Entrar",
-  googleEnabled,
+  signInOptions,
   callbackUrl,
   ...props
-}: ButtonProps & { googleEnabled: boolean; callbackUrl?: string }) {
+}: ButtonProps & { signInOptions: SignInOptions; callbackUrl?: string }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -21,7 +22,7 @@ export function SignInButton({
         </Button>
       </DialogTrigger>
       <DialogContent>
-        <SignInDialogContent googleEnabled={googleEnabled} callbackUrl={callbackUrl} />
+        <SignInDialogContent options={signInOptions} callbackUrl={callbackUrl} />
       </DialogContent>
     </Dialog>
   )

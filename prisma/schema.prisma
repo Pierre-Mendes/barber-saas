@@ -19,6 +19,8 @@ model User {
   emailVerified   DateTime?
   image           String?
   phone           String?
+  /// Hash scrypt da senha (`scrypt$salt$hash`). Nulo para quem só entra por link ou Google.
+  passwordHash    String?
   isPlatformAdmin Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -62,25 +64,28 @@ model VerificationToken {
 // ─── Tenant (barbearia) ──────────────────────────────────────────────────────
 
 model Tenant {
-  id                  String   @id @default(cuid())
-  slug                String   @unique
-  customDomain        String?  @unique
+  id                  String             @id @default(cuid())
+  slug                String             @unique
+  customDomain        String?            @unique
   name                String
-  description         String   @default("")
-  address             String   @default("")
-  phones              String[] @default([])
+  description         String             @default("")
+  address             String             @default("")
+  phones              String[]           @default([])
   logoUrl             String?
   bannerUrl           String?
-  primaryColor        String   @default("#8162ff")
-  timezone            String   @default("America/Sao_Paulo")
-  slotIntervalMinutes Int      @default(15)
-  minBookingLeadMin   Int      @default(30)
-  minCancelHours      Int      @default(2)
-  bookingWindowDays   Int      @default(30)
-  listedInMarketplace Boolean  @default(true)
-  active              Boolean  @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  primaryColor        String             @default("#8162ff")
+  timezone            String             @default("America/Sao_Paulo")
+  slotIntervalMinutes Int                @default(15)
+  minBookingLeadMin   Int                @default(30)
+  minCancelHours      Int                @default(2)
+  cancellationPolicy  CancellationPolicy @default(HOURS_BEFORE_START)
+  /// Usado com `WINDOW_AFTER_BOOKING`: minutos, a partir da reserva, em que o cliente pode cancelar.
+  cancelWindowMinutes Int                @default(60)
+  bookingWindowDays   Int                @default(30)
+  listedInMarketplace Boolean            @default(true)
+  active              Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   memberships Membership[]
   barbers     Barber[]
@@ -88,6 +93,16 @@ model Tenant {
   customers   Customer[]
   bookings    Booking[]
   favorites   Favorite[]
+}
+
+/// Como o cliente pode cancelar pela internet (a equipe sempre pode).
+enum CancellationPolicy {
+  /// Não cancela online: precisa falar com a barbearia.
+  NONE
+  /// Até `minCancelHours` antes do horário.
+  HOURS_BEFORE_START
+  /// Até `cancelWindowMinutes` depois de fazer a reserva (e sempre antes do horário).
+  WINDOW_AFTER_BOOKING
 }
 
 enum Role {
@@ -191,19 +206,23 @@ model TimeOff {
   @@index([barberId, startsAt])
 }
 
+/// Cliente dentro de uma barbearia. `userId` nulo = agendou sem conta (identificado pelo e-mail);
+/// ao criar conta com o mesmo e-mail, o registro é ligado ao usuário.
 model Customer {
   id        String   @id @default(cuid())
   tenantId  String
-  userId    String
+  userId    String?
+  email     String?
   name      String
   phone     String?
   createdAt DateTime @default(now())
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings Booking[]
 
   @@unique([tenantId, userId])
+  @@unique([tenantId, email])
 }
 
 enum BookingStatus {
@@ -226,6 +245,8 @@ model Booking {
   status         BookingStatus @default(CONFIRMED)
   price          Decimal       @db.Decimal(10, 2)
   notes          String        @default("")
+  /// Segredo do link "ver ou cancelar" enviado por e-mail (permite gerenciar sem conta).
+  accessToken    String?       @unique
   cancelledAt    DateTime?
   reminderSentAt DateTime?
   createdAt      DateTime      @default(now())

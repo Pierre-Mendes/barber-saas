@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 
-/** Tamanho máximo de uma imagem enviada (logo, capa, serviço, barbeiro). */
+/** Tamanho máximo de uma imagem enviada (logo, capa, serviço, barbeiro, foto de perfil). */
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 export type ImageKind = "logo" | "banner" | "service" | "barber"
@@ -56,4 +56,9 @@ export function validateImage(bytes: Uint8Array): ImageValidation {
 /** Chave do objeto: isolada por barbearia e imprevisível. */
 export function buildObjectKey(tenantId: string, kind: ImageKind, ext: ImageType["ext"]): string {
   return `tenants/${tenantId}/${kind}/${randomUUID()}.${ext}`
+}
+
+/** Chave da foto de perfil: isolada por usuário (não pertence a nenhuma barbearia). */
+export function buildAvatarKey(userId: string, ext: ImageType["ext"]): string {
+  return `users/${userId}/avatar/${randomUUID()}.${ext}`
 }

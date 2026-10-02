@@ -1,4 +1,5 @@
 import type { BookingStatus } from "@prisma/client"
+import { cancellationDeadline, canCustomerCancel, describeCancellationPolicy } from "@/lib/booking/policy"
 import { googleCalendarUrl, outlookCalendarUrl } from "@/lib/calendar/ics"
 import { tenantFallbackCover } from "@/lib/catalog"
 import { bookingCalendarEvent, type LoadedBooking } from "@/lib/notifications"
@@ -11,7 +12,10 @@ export interface BookingCardData {
   status: BookingStatus
   isUpcoming: boolean
   canCancel: boolean
-  minCancelHours: number
+  /** Até quando o cliente pode cancelar online (ISO), se a barbearia permitir. */
+  cancelDeadline: string | null
+  /** Política de cancelamento em uma frase. */
+  cancellationText: string
   serviceName: string
   price: string
   startsAt: string
@@ -35,15 +39,20 @@ export const bookingCardInclude = {
   customer: { include: { user: true } },
 } as const
 
-export function toBookingCard(booking: LoadedBooking, now: Date = new Date()): BookingCardData {
+/**
+ * `accessToken`: quando a página foi aberta pelo link do e-mail (sem login), os links de
+ * download/cancelamento levam o segredo junto.
+ */
+export function toBookingCard(booking: LoadedBooking, now: Date = new Date(), accessToken?: string): BookingCardData {
   const isUpcoming = booking.status === "CONFIRMED" && booking.endsAt > now
   const event = bookingCalendarEvent(booking)
   return {
     id: booking.id,
     status: booking.status,
     isUpcoming,
-    canCancel: isUpcoming && booking.startsAt.getTime() - booking.tenant.minCancelHours * 3_600_000 > now.getTime(),
-    minCancelHours: booking.tenant.minCancelHours,
+    canCancel: isUpcoming && canCustomerCancel(booking.tenant, booking, now),
+    cancelDeadline: cancellationDeadline(booking.tenant, booking)?.toISOString() ?? null,
+    cancellationText: describeCancellationPolicy(booking.tenant),
     serviceName: booking.service.name,
     price: formatCurrency(booking.price),
     startsAt: booking.startsAt.toISOString(),
@@ -60,7 +69,7 @@ export function toBookingCard(booking: LoadedBooking, now: Date = new Date()): B
     calendar: {
       google: googleCalendarUrl(event),
       outlook: outlookCalendarUrl(event),
-      ics: `/api/bookings/${booking.id}/ics`,
+      ics: `/api/bookings/${booking.id}/ics${accessToken ? `?token=${encodeURIComponent(accessToken)}` : ""}`,
     },
   }
 }

@@ -6,11 +6,11 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3"
-import { buildObjectKey, validateImage, type ImageKind } from "./images"
+import { buildAvatarKey, buildObjectKey, validateImage, type ImageKind, type ImageType } from "./images"
 
 /**
  * Armazenamento de imagens em qualquer serviço compatível com S3:
- * SeaweedFS (padrão do docker-compose), Garage, MinIO, Cloudflare R2 ou AWS S3.
+ * MinIO (padrão do docker-compose), Garage, SeaweedFS, Cloudflare R2 ou AWS S3.
  */
 
 interface StorageConfig {
@@ -89,6 +89,15 @@ export class StorageError extends Error {}
  * A chave inclui o `tenantId`, então uma barbearia nunca sobrescreve arquivo de outra.
  */
 export async function storeTenantImage(tenantId: string, kind: ImageKind, file: File): Promise<string> {
+  return storeImage(file, (ext) => buildObjectKey(tenantId, kind, ext))
+}
+
+/** Foto de perfil do usuário (vale em todas as barbearias). */
+export async function storeUserAvatar(userId: string, file: File): Promise<string> {
+  return storeImage(file, (ext) => buildAvatarKey(userId, ext))
+}
+
+async function storeImage(file: File, keyFor: (ext: ImageType["ext"]) => string): Promise<string> {
   const config = readConfig()
   if (!config) {
     throw new StorageError("Upload de imagens não está configurado. Use uma URL.")
@@ -99,7 +108,7 @@ export async function storeTenantImage(tenantId: string, kind: ImageKind, file: 
     throw new StorageError(validation.error)
   }
   await ensureBucket(config)
-  const key = buildObjectKey(tenantId, kind, validation.type.ext)
+  const key = keyFor(validation.type.ext)
   await client(config).send(
     new PutObjectCommand({
       Bucket: config.bucket,
@@ -114,8 +123,17 @@ export async function storeTenantImage(tenantId: string, kind: ImageKind, file: 
 
 /** Remove uma imagem antiga, se ela for deste storage e desta barbearia. Nunca lança erro. */
 export async function removeTenantImage(tenantId: string, url: string | null | undefined): Promise<void> {
+  return removeUnder(`tenants/${tenantId}/`, url)
+}
+
+/** Remove uma foto de perfil antiga do próprio usuário. Nunca lança erro. */
+export async function removeUserAvatar(userId: string, url: string | null | undefined): Promise<void> {
+  return removeUnder(`users/${userId}/`, url)
+}
+
+async function removeUnder(prefix: string, url: string | null | undefined): Promise<void> {
   const config = readConfig()
-  if (!config || !url?.startsWith(`${config.publicUrl}/tenants/${tenantId}/`)) {
+  if (!config || !url?.startsWith(`${config.publicUrl}/${prefix}`)) {
     return
   }
   const key = url.slice(config.publicUrl.length + 1)

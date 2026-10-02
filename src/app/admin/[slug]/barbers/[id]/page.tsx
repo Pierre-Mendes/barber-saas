@@ -14,7 +14,7 @@ import { isStorageConfigured } from "@/lib/storage"
 import { can, ROLE_LABELS } from "@/lib/auth/permissions"
 import { db } from "@/lib/db"
 import { formatDateTime, minutesToHHMM, WEEKDAY_LABELS } from "@/lib/scheduling/time"
-import { addTimeOff, removeTimeOff, updateBarberProfile, updateWorkingHours } from "../../actions"
+import { addTimeOff, removeTimeOff, updateBarberProfile, updateOwnBarberProfile, updateWorkingHours } from "../../actions"
 
 export default async function BarberDetailPage({
   params,
@@ -72,7 +72,7 @@ export default async function BarberDetailPage({
                 <Field label="Nome">
                   <Input name="name" defaultValue={barber.name} />
                 </Field>
-                <ImageField label="Foto" fileName="photoFile" urlName="photoUrl" currentUrl={barber.photoUrl} uploadEnabled={isStorageConfigured()} />
+                <ImageField label="Foto" fileName="photoFile" urlName="photoUrl" currentUrl={barber.photoUrl} uploadEnabled={isStorageConfigured()} aspect="round" />
                 <Field label="Bio" className="sm:col-span-2">
                   <Textarea name="bio" defaultValue={barber.bio} rows={2} />
                 </Field>
@@ -101,6 +101,27 @@ export default async function BarberDetailPage({
                     ))}
                   </div>
                 </fieldset>
+                <SubmitButton className="sm:col-span-2 sm:justify-self-start">Salvar perfil</SubmitButton>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {!canEditProfile && ctx.ownBarber?.id === barber.id && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Meu perfil</CardTitle>
+              <CardDescription>Como você aparece para os clientes na página da barbearia.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={updateOwnBarberProfile.bind(null, slug, barber.id)} className="grid gap-4 sm:grid-cols-2">
+                <Field label="Nome">
+                  <Input name="name" defaultValue={barber.name} />
+                </Field>
+                <ImageField label="Foto" fileName="photoFile" urlName="photoUrl" currentUrl={barber.photoUrl} uploadEnabled={isStorageConfigured()} aspect="round" />
+                <Field label="Bio" className="sm:col-span-2">
+                  <Textarea name="bio" defaultValue={barber.bio} rows={2} />
+                </Field>
                 <SubmitButton className="sm:col-span-2 sm:justify-self-start">Salvar perfil</SubmitButton>
               </form>
             </CardContent>
