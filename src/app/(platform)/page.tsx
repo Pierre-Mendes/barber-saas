@@ -3,6 +3,7 @@ import { BellRingIcon, CalendarPlusIcon, LayoutDashboardIcon, ShieldCheckIcon, S
 import { auth } from "@/auth"
 import { BarbershopItem } from "@/components/barbershop-item"
 import { BookingItem } from "@/components/booking-item"
+import { DemoAccess } from "@/components/demo-access"
 import { HomeBanner } from "@/components/home-banner"
 import { HorizontalList } from "@/components/horizontal-list"
 import { QuickSearch } from "@/components/quick-search"
@@ -137,6 +138,7 @@ const FEATURES = [
 ]
 
 function Landing() {
+  const { demoAccounts } = signInOptions()
   return (
     <div className="space-y-10">
       <section className="grid items-center gap-8 md:grid-cols-2">
@@ -160,6 +162,8 @@ function Landing() {
         </div>
         <HomeBanner title={`Agende nos melhores com ${PLATFORM_NAME}`} />
       </section>
+
+      {demoAccounts.length > 0 && <DemoAccess accounts={demoAccounts} />}
 
       <section className="grid gap-4 md:grid-cols-3">
         {FEATURES.map((feature) => (

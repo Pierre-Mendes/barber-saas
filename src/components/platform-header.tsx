@@ -2,6 +2,7 @@ import Link from "next/link"
 import { ScissorsIcon } from "lucide-react"
 import { auth, signOut } from "@/auth"
 import { AppMenu, type MenuLink } from "@/components/app-menu"
+import { SignInButton } from "@/components/sign-in-button"
 import { Card } from "@/components/ui/card"
 import { signInOptions } from "@/lib/auth/options"
 import { ROLE_LABELS } from "@/lib/auth/permissions"
@@ -55,13 +56,21 @@ export async function PlatformHeader() {
         <Link href="/">
           <PlatformLogo />
         </Link>
-        <AppMenu
-          user={user}
-          links={links}
-          showCategories
-          signInOptions={signInOptions()}
-          signOutAction={signOutAction}
-        />
+        <div className="flex items-center gap-2">
+          {/* Sem login: botão visível (não só dentro do menu). */}
+          {!user && (
+            <SignInButton signInOptions={signInOptions()} callbackUrl="/">
+              Entrar
+            </SignInButton>
+          )}
+          <AppMenu
+            user={user}
+            links={links}
+            showCategories
+            signInOptions={signInOptions()}
+            signOutAction={signOutAction}
+          />
+        </div>
       </div>
     </Card>
   )

@@ -232,8 +232,9 @@ npm run dev
 
 O seed cria 8 barbearias fictícias em **Uberaba-MG** (Zebu Barber Club, Vintage Barber, Barba Negra, The Dapper Den…).
 
-Todas as contas usam a senha **`barber123`**. Em desenvolvimento, a tela de login mostra botões de
-**acesso rápido** (Dono, Recepção, Barbeiro, Cliente): um clique e você está dentro, já na visão certa.
+Todas as contas usam a senha **`barber123`**. Em desenvolvimento, a página inicial (seção *Experimente cada
+visão*) e a tela de login mostram botões de **acesso rápido** (Dono, Recepção, Barbeiro, Cliente): um clique e
+você está dentro, já na visão certa. O botão **Entrar** do topo abre o login normal.
 Para desligar, `DEMO_LOGINS=false`; em produção eles só aparecem com `DEMO_LOGINS=true`.
 
 | E-mail | Perfil |
